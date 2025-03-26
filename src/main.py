@@ -1,8 +1,12 @@
 import sys
+from socket import socket
 from collections import OrderedDict
-
+from connection import Connection
+from peerManager import PeerManager
 # Exit constant
 EXIT_COMMAND = 9
+
+peerManager = PeerManager()
 
 def list_peers():
     print("")
@@ -33,7 +37,7 @@ def exit():
     #TODO: Implementation
 
 commands_functions = {
-    1: {"description": "Listar peers", "function": list_peers},
+    1: {"description": "Listar peers", "function": peerManager.list_peers},
     2: {"description": "Obter peers", "function": get_peers},
     3: {"description": "Listar arquivos locais", "function": list_local_files},
     4: {"description": "Buscar arquivos", "function": search_files},
@@ -65,14 +69,34 @@ def menu():
         except ValueError:
             print("Por favor, insira um número válido.")
 
-
+def read_peers(peers_file: str, peer_manager: PeerManager) -> None:
+    try:
+        with open(peers_file, 'r') as file:
+            for line in file:
+                address, port = line.strip().split(':')
+                peer_manager.add_peer(address, int(port))
+    except FileNotFoundError:
+        raise RuntimeError(f"Erro: O arquivo {peers_file} não foi encontrado.")
+    except ValueError:
+        raise RuntimeError("Erro: O arquivo de peers contém uma linha inválida.")
 
 def main():
     address, port = sys.argv[1].split(':')
     peers_file = sys.argv[2]
     shared_dir = sys.argv[3]
 
-    menu()
+    connection = Connection(address, port)
+    connection.start_server()
+    #Eu não coloquei o start_server no innit do connection, mas pode ser uma possibilidade,
+    #seria mais acoplado, mas não sei se haverá uma situação em que a classe será iniciada sem precisar da conexão
+    
+    #TODO criar conexão TCP com adress e port
+    try:
+        read_peers(peers_file, peerManager)
+        #TODO Verificar se o diretório de compartilhamento é válido 
+        menu()
+    except RuntimeError as error:
+        print(error)
 
 if __name__ == '__main__':
     main()
