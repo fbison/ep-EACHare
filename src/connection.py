@@ -19,7 +19,7 @@ class Connection:
         #TODO Retirar esse print após testes
         print(f"Peer ativo em {self.address}:{self.port}")
 
-        # Inicia um thread daemos para aceitar conexões,
+        # Inicia um thread daemon para aceitar conexões,
         # elas são executadas em segundo plano e não bloqueiam o programa ser finalizado
         thread = threading.Thread(target=self.accept_connections, daemon=True)
         thread.start()
