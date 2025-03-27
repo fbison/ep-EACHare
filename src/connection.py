@@ -46,24 +46,59 @@ class Connection:
                 if not data:
                     #TODO adicionar um handle message que trata todo tipo de mensagem
                     break
-                print(f"Recebido: {data}")
-                client_socket.send("ACK".encode())  # Responde com um ACK
+                self.handle_message(data)
+                client_socket.send(self.format_message("ACK").encode())  #TODO Verificar se vai precisar de um ack mesmo
         except Exception as e:
             print(f"Erro ao lidar com cliente: {e}")
         finally:
             client_socket.close()
 
-    def connect_to_peer(self, peer: Peer):
-        """Conecta-se a um peer para trocar informações."""
+    #Usar isso pra handle message
+    message_type = {
+        "HELLO","PEERS_LIST", "GET_PEERS", "BYE","ACK"
+    }
+    
+    def format_message(self, message_type: str, *args) -> str:
+        args_str = " ".join(map(str, args)) if args else ""
+        return f"{self.address}:{self.port} CLOCK {message_type} {args_str}"
+    
+    def handle_message(self, message:str):
+        print(f"Resposta Recebida: {message}")
+        message = message.split(" ")
+        print(message)
+        if message[2] == "HELLO":
+            #TODO Implementar
+            print("Colocar como online")
+        elif message[2] == "PEERS_LIST":
+            #TODO Implementar
+            print("Lista de peers recebida")
+        elif message[2] == "GET_PEERS":
+            #TODO Implementar
+            print("Recebido pedido de lista de peers")
+        elif message[2] == "BYE":
+            #TODO Implementar
+            print("Peer desconectado")
+        elif message[2] == "ACK":
+            #TODO Implementar
+            print("Mensagem recebida com sucesso")
+        else:
+            print("Mensagem desconhecida")
+
+    def send_message(self, peer: Peer, type: str, *args):
+        #Conecta-se com um peer para o envio de uma mensagem, toda mensagem cria uma nova conexão
         try:
             with socket.create_connection((peer.ip, int(peer.port))) as peer_socket:
                 #TODO Verificar com o professor sobre deixar a conexão aberta após receber um HELLO,
-                #     ou se é para fechar a conexão após receber a resposta
-                peer_socket.send("HELLO".encode())
+                #     ou se é para fechar a conexão após receber a resposta como está sendo feito
+                print(type)
+                print(args)
+                message=self.format_message(type, *args)
+                print(f"Encaminhando mensagem {message} para {peer.ip}:{peer.port}")
+                peer_socket.send(message.encode())
                 #TODO Formatar a função corretamente, vale a pena criar uma função que faz isso e envia as mensagens
                 # facilitando até pra concentrar a impressão de logs em um só lugar	
-                response = peer_socket.recv(1024).decode()
-                print(f"Resposta do peer {peer.ip}:{peer.port} -> {response}")
+                self.handle_message(peer_socket.recv(1024).decode())
+                #TODO Verificar se é necessário fechar a conexão após receber a resposta
         except Exception as e:
             print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
 

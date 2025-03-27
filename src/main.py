@@ -3,14 +3,11 @@ from socket import socket
 from collections import OrderedDict
 from connection import Connection
 from peerManager import PeerManager
+from peer import Peer
 # Exit constant
 EXIT_COMMAND = 9
 
 peerManager = PeerManager()
-
-def list_peers():
-    print("")
-    #TODO: Implementation
 
 def get_peers():
     print("")
@@ -34,17 +31,7 @@ def change_chunk_size():
 
 def exit():
     print("")
-    #TODO: Implementation
-
-commands_functions = {
-    1: {"description": "Listar peers", "function": peerManager.list_peers},
-    2: {"description": "Obter peers", "function": get_peers},
-    3: {"description": "Listar arquivos locais", "function": list_local_files},
-    4: {"description": "Buscar arquivos", "function": search_files},
-    5: {"description": "Exibir estatisticas", "function": show_statistics},
-    6: {"description": "Alterar tamanho de chunk", "function": change_chunk_size},
-    EXIT_COMMAND: {"description": "Sair", "function": exit}
-}
+    #TODO: Implementation e envio das mensagens BYE para que os outros peers alterem o estado do peer como offline
 
 
 def show_commands():
@@ -80,11 +67,44 @@ def read_peers(peers_file: str, peer_manager: PeerManager) -> None:
     except ValueError:
         raise RuntimeError("Erro: O arquivo de peers contém uma linha inválida.")
 
+#TODO: Verificar se o menu de peers deve ficar iterando até a pessoa sair 
+# ou após mandar um HELLO ele retorna para o menu anterior
+
+def menu_peers(peers: list[Peer], function: callable) -> None:
+    while True:
+        print("\t [0] voltar para o menu anterior")
+        for index, peer in enumerate(peers, start=1):
+            print(f"\t [{index}] {peer.ip}:{peer.port} {'ONLINE' if peer.online else 'OFFLINE'}")
+        command_number = int(input(">"))
+        if command_number == 0:
+            break
+        if command_number > len(peers):
+            print("Por favor, insira um número válido.")
+            continue
+        function(peers[command_number-1])
+
+def hello(peer: Peer):
+    connection.send_message(peer, "HELLO")
+
+def list_peers():
+    peers= peerManager.list_peers()
+    menu_peers(peers, hello)
+    
+commands_functions = {
+    1: {"description": "Listar peers", "function": list_peers},
+    2: {"description": "Obter peers", "function": get_peers},
+    3: {"description": "Listar arquivos locais", "function": list_local_files},
+    4: {"description": "Buscar arquivos", "function": search_files},
+    5: {"description": "Exibir estatisticas", "function": show_statistics},
+    6: {"description": "Alterar tamanho de chunk", "function": change_chunk_size},
+    EXIT_COMMAND: {"description": "Sair", "function": exit}
+}
 def main():
     address, port = sys.argv[1].split(':')
     peers_file = sys.argv[2]
     shared_dir = sys.argv[3]
 
+    global connection #TODO: Verificar se é uma boa prática e o melhor jeito de fazer isso
     connection = Connection(address, port)
     connection.start_server()
     #Eu não coloquei o start_server no innit do connection, mas pode ser uma possibilidade,
