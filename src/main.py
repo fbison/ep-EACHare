@@ -30,9 +30,10 @@ def change_chunk_size():
     #TODO: Implementation
 
 def exit():
-    print("")
-    #TODO: Implementation e envio das mensagens BYE para que os outros peers alterem o estado do peer como offline
-
+    for peer in peerManager.get_online_peers():
+        connection.send_message(peer, "BYE")
+    connection.stop()
+    sys.exit()
 
 def show_commands():
     print("Escolha um comando:")
