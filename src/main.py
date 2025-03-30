@@ -85,7 +85,11 @@ def menu_peers(peers: list[Peer], function: callable) -> None:
         function(peers[command_number-1])
 
 def hello(peer: Peer):
-    connection.send_message(peer, "HELLO")
+    try:
+        connection.send_message(peer, "HELLO")
+    except RuntimeError as error:
+        print(error)
+    peer.set_online()
 
 def list_peers():
     peers= peerManager.list_peers()
@@ -106,7 +110,7 @@ def main():
     shared_dir = sys.argv[3]
 
     global connection #TODO: Verificar se é uma boa prática e o melhor jeito de fazer isso
-    connection = Connection(address, port)
+    connection = Connection(address, port, peerManager)
     
     #TODO criar conexão TCP com adress e port
     try:

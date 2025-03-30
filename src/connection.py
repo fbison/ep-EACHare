@@ -5,9 +5,10 @@ from peer import Peer
 MAX_CONNECTIONS = int(5)
 
 class Connection:
-    def __init__(self, address, port):
+    def __init__(self, address, port, peerManager):
         self.address = address
         self.port = int(port)
+        self.peerManager = peerManager
         self.running = False
         self.threads = []
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -71,8 +72,9 @@ class Connection:
         message = message.split(" ")
         print(message)
         if message[2] == "HELLO":
-            #TODO Implementar
-            print("Colocar como online")
+            peer_ip, peer_port = message[0].split(":")
+            self.peerManager.add_peer(peer_ip, peer_port)
+            self.peerManager.get_peer(peer_ip, peer_port).set_online()
         elif message[2] == "PEERS_LIST":
             #TODO Implementar
             print("Lista de peers recebida")
@@ -81,7 +83,7 @@ class Connection:
             print("Recebido pedido de lista de peers")
         elif message[2] == "BYE":
             peer_ip, peer_port = message[0].split(":")
-            peer_manager.get_peer(peer_ip, peer_port).set_offline()
+            self.peerManager.get_peer(peer_ip, peer_port).set_offline()
         elif message[2] == "ACK":
             #TODO Implementar
             print("Mensagem recebida com sucesso")
