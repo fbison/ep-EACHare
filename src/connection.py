@@ -1,0 +1,110 @@
+import socket
+import threading
+from peer import Peer
+
+MAX_CONNECTIONS = int(5)
+
+class Connection:
+    def __init__(self, address, port):
+        self.address = address
+        self.port = int(port)
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        #socket.AF_INET define o uso de protocolos IPv4
+        #socket.SOCK_STREAM define o uso de TCP
+        self.running = True  # Controle da execução
+        #TODO verificar se não tem uma maneira melhor de fazer esse controle
+
+    def start_server(self):
+        self.socket.bind((self.address, self.port))  
+        self.socket.listen(MAX_CONNECTIONS)  # Máximo de conexões na fila
+        #TODO verificar o valor adequado para MAX_CONNECTIONS
+        #TODO Retirar esse print após testes
+        print(f"Peer ativo em {self.address}:{self.port}")
+
+        # Inicia um thread daemon para aceitar conexões,
+        # elas são executadas em segundo plano e não bloqueiam o programa ser finalizado
+        thread = threading.Thread(target=self.accept_connections, daemon=True)
+        thread.start()
+
+    def accept_connections(self):
+        """Aceita conexões de outros peers e gerencia as requisições."""
+        while self.running:
+            try:
+                client_socket, client_address = self.socket.accept() 
+                #self.socket.accept() Bloqueia a execução da thread até receber uma conexão
+                print(f"Conexão recebida de {client_address}") #TODO Retirar esse print após testes
+
+                # Inicia um thread para tratar essa conexão
+                thread = threading.Thread(target=self.handle_client, args=(client_socket,))
+                thread.start()
+            except Exception as e:
+                print(f"Erro ao aceitar conexão: {e}")
+
+    def handle_client(self, client_socket):
+        """Lida com mensagens recebidas de um peer."""
+        try:
+            while self.running:
+                data = client_socket.recv(1024).decode()
+                if not data:
+                    #TODO adicionar um handle message que trata todo tipo de mensagem
+                    break
+                self.handle_message(data)
+                client_socket.send(self.format_message("ACK").encode())  #TODO Verificar se vai precisar de um ack mesmo
+        except Exception as e:
+            print(f"Erro ao lidar com cliente: {e}")
+        finally:
+            client_socket.close()
+
+    #Usar isso pra handle message
+    message_type = {
+        "HELLO","PEERS_LIST", "GET_PEERS", "BYE","ACK"
+    }
+    
+    def format_message(self, message_type: str, *args) -> str:
+        args_str = " ".join(map(str, args)) if args else ""
+        return f"{self.address}:{self.port} CLOCK {message_type} {args_str}"
+    
+    def handle_message(self, message:str):
+        print(f"Resposta Recebida: {message}")
+        message = message.split(" ")
+        print(message)
+        if message[2] == "HELLO":
+            #TODO Implementar
+            print("Colocar como online")
+        elif message[2] == "PEERS_LIST":
+            #TODO Implementar
+            print("Lista de peers recebida")
+        elif message[2] == "GET_PEERS":
+            #TODO Implementar
+            print("Recebido pedido de lista de peers")
+        elif message[2] == "BYE":
+            #TODO Implementar
+            print("Peer desconectado")
+        elif message[2] == "ACK":
+            #TODO Implementar
+            print("Mensagem recebida com sucesso")
+        else:
+            print("Mensagem desconhecida")
+
+    def send_message(self, peer: Peer, type: str, *args): #TODO verificar se type não é uma palavra reservada
+        #Conecta-se com um peer para o envio de uma mensagem, toda mensagem cria uma nova conexão
+        try:
+            with socket.create_connection((peer.ip, int(peer.port))) as peer_socket:
+                #TODO Verificar com o professor sobre deixar a conexão aberta após receber um HELLO,
+                #     ou se é para fechar a conexão após receber a resposta como está sendo feito
+                print(type)
+                print(args)
+                message=self.format_message(type, *args)
+                print(f"Encaminhando mensagem {message} para {peer.ip}:{peer.port}")
+                peer_socket.send(message.encode())
+                #TODO Formatar a função corretamente, vale a pena criar uma função que faz isso e envia as mensagens
+                # facilitando até pra concentrar a impressão de logs em um só lugar	
+                self.handle_message(peer_socket.recv(1024).decode())
+                #TODO Verificar se é necessário fechar a conexão após receber a resposta
+        except Exception as e:
+            print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
+
+    def stop(self):
+        self.running = False
+        self.socket.close()
+        print("Servidor encerrado.")
