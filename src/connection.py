@@ -12,10 +12,12 @@ class Connection:
         #socket.AF_INET define o uso de protocolos IPv4
         #socket.SOCK_STREAM define o uso de TCP
         self.running = True  # Controle da execução
+        #TODO verificar se não tem uma maneira melhor de fazer esse controle
 
     def start_server(self):
-        self.socket.bind((self.address, self.port))
+        self.socket.bind((self.address, self.port))  
         self.socket.listen(MAX_CONNECTIONS)  # Máximo de conexões na fila
+        #TODO verificar o valor adequado para MAX_CONNECTIONS
         #TODO Retirar esse print após testes
         print(f"Peer ativo em {self.address}:{self.port}")
 
@@ -30,7 +32,7 @@ class Connection:
             try:
                 client_socket, client_address = self.socket.accept() 
                 #self.socket.accept() Bloqueia a execução da thread até receber uma conexão
-                print(f"Conexão recebida de {client_address}")
+                print(f"Conexão recebida de {client_address}") #TODO Retirar esse print após testes
 
                 # Inicia um thread para tratar essa conexão
                 thread = threading.Thread(target=self.handle_client, args=(client_socket,))
@@ -84,7 +86,7 @@ class Connection:
         else:
             print("Mensagem desconhecida")
 
-    def send_message(self, peer: Peer, type: str, *args):
+    def send_message(self, peer: Peer, type: str, *args): #TODO verificar se type não é uma palavra reservada
         #Conecta-se com um peer para o envio de uma mensagem, toda mensagem cria uma nova conexão
         try:
             with socket.create_connection((peer.ip, int(peer.port))) as peer_socket:

@@ -106,14 +106,12 @@ def main():
 
     global connection #TODO: Verificar se é uma boa prática e o melhor jeito de fazer isso
     connection = Connection(address, port)
-    connection.start_server()
-    #Eu não coloquei o start_server no innit do connection, mas pode ser uma possibilidade,
-    #seria mais acoplado, mas não sei se haverá uma situação em que a classe será iniciada sem precisar da conexão
     
     #TODO criar conexão TCP com adress e port
     try:
         read_peers(peers_file, peerManager)
         #TODO Verificar se o diretório de compartilhamento é válido 
+        connection.start_server() # Após ler os peers, inicia o servidor, conforme a especificação
         menu()
     except RuntimeError as error:
         print(error)
