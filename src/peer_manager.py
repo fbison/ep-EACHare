@@ -6,26 +6,26 @@ class PeerManager:
 
     #TODO Verificar se imprimimos logs nossos ou só deixamos comentado para ficar só os do professor impressos
 
+    def is_peer(self, ip: str, port: int) -> bool:
+        return (ip, port) in self.peers
+
     def add_peer(self, ip: str, port: int) -> None:
-        if (ip, port) in self.peers:
-            print(f"Peer {ip}:{port} já está presente no PeerManager.")
+        if self.is_peer(ip, port):
             return
         self.peers[(ip, port)] = Peer(ip, port)
-        print(f"Adicionando novo peer {ip}:{port} status OFFLINE")
     
     def add_peer_with_details(self, ip: str, port: int, online: bool, mysterious_number: int) -> None:
-        if (ip, port) in self.peers:
+        if self.is_peer(ip, port):
             self.get_peer(ip, port).set_online() if online else self.get_peer(ip, port).set_offline()
             self.get_peer(ip, port).set_mysterious_number(mysterious_number)
             return
         self.peers[(ip, port)] = Peer(ip, port, online=online, mysterious_number=mysterious_number)
-    
+
     def add_online_peer(self, ip: str, port: int) -> None:
-        if (ip, port) in self.peers:
+        if self.is_peer(ip, port):
             peer = self.get_peer(ip, port)
             peer.set_online()
         self.peers[(ip, port)] = Peer(ip, port, True)
-        print(f"Adicionando novo peer {ip}:{port} status ONLINE")
 
     def get_peer(self, ip: str, port: int) -> Peer:
         return self.peers[(ip, port)]

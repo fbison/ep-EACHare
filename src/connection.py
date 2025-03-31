@@ -70,10 +70,11 @@ class Connection:
         peers_list = peers_list_str.split("\n")
         for peer in peers_list:
             peer_data = peer.split(":")
-            if(self.address == peer_data[0] and self.port == peer_data[1]):
+            port = int(peer_data[1])
+            if(self.address == peer_data[0] and self.port == port):
                 continue
             status = True if peer_data[3] == "ONLINE" else False
-            self.peer_manager.add_peer_with_details(peer_data[0], peer_data[1], status, peer_data[3])
+            self.peer_manager.add_peer_with_details(peer_data[0], port, status, peer_data[3])
 
     def format_message(self, message_type: str, *args) -> str:
         args_str = " ".join(map(str, args)) if args else ""
