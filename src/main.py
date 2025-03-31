@@ -9,9 +9,13 @@ EXIT_COMMAND = 9
 
 peer_manager = PeerManager()
 
+
+def hello(peer: Peer):
+    connection.send_message(peer, "HELLO")
+
 def get_peers():
-    print("")
-    #TODO: Implementation
+    for peer in peer_manager.list_peers():
+        connection.send_message(peer, "GET_PEERS")
 
 def list_local_files():
     print("")
@@ -83,13 +87,6 @@ def menu_peers(peers: list[Peer], function: callable) -> None:
             print("Por favor, insira um número válido.")
             continue
         function(peers[command_number-1])
-
-def hello(peer: Peer):
-    try:
-        connection.send_message(peer, "HELLO")
-    except RuntimeError as error:
-        print(error)
-    peer.set_online()
 
 def list_peers():
     peers= peer_manager.list_peers()
