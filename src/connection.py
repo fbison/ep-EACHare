@@ -5,14 +5,15 @@ from peer import Peer
 MAX_CONNECTIONS = int(5)
 
 class Connection:
-    def __init__(self, address, port):
+    def __init__(self, address, port, peerManager):
         self.address = address
         self.port = int(port)
+        self.peerManager = peerManager
+        self.running = False
+        self.threads = []
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #socket.AF_INET define o uso de protocolos IPv4
         #socket.SOCK_STREAM define o uso de TCP
-        self.running = True  # Controle da execução
-        #TODO verificar se não tem uma maneira melhor de fazer esse controle
 
     def start_server(self):
         self.socket.bind((self.address, self.port))  
@@ -20,6 +21,7 @@ class Connection:
         #TODO verificar o valor adequado para MAX_CONNECTIONS
         #TODO Retirar esse print após testes
         print(f"Peer ativo em {self.address}:{self.port}")
+        self.running = True  # Controle da execução
 
         # Inicia um thread daemon para aceitar conexões,
         # elas são executadas em segundo plano e não bloqueiam o programa ser finalizado
@@ -37,6 +39,7 @@ class Connection:
                 # Inicia um thread para tratar essa conexão
                 thread = threading.Thread(target=self.handle_client, args=(client_socket,))
                 thread.start()
+                self.threads.append(thread)
             except Exception as e:
                 print(f"Erro ao aceitar conexão: {e}")
 
@@ -69,8 +72,9 @@ class Connection:
         message = message.split(" ")
         print(message)
         if message[2] == "HELLO":
-            #TODO Implementar
-            print("Colocar como online")
+            peer_ip, peer_port = message[0].split(":")
+            self.peerManager.add_peer(peer_ip, peer_port)
+            self.peerManager.get_peer(peer_ip, peer_port).set_online()
         elif message[2] == "PEERS_LIST":
             #TODO Implementar
             print("Lista de peers recebida")
@@ -78,8 +82,8 @@ class Connection:
             #TODO Implementar
             print("Recebido pedido de lista de peers")
         elif message[2] == "BYE":
-            #TODO Implementar
-            print("Peer desconectado")
+            peer_ip, peer_port = message[0].split(":")
+            self.peerManager.get_peer(peer_ip, peer_port).set_offline()
         elif message[2] == "ACK":
             #TODO Implementar
             print("Mensagem recebida com sucesso")
@@ -107,4 +111,6 @@ class Connection:
     def stop(self):
         self.running = False
         self.socket.close()
-        print("Servidor encerrado.")
+        for thread in self.threads:
+            thread.join() # Espera as threads terminarem
+        print("Saindo...")
