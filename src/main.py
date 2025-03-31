@@ -2,12 +2,12 @@ import sys
 from socket import socket
 from collections import OrderedDict
 from connection import Connection
-from peerManager import PeerManager
+from peer_manager import PeerManager
 from peer import Peer
 # Exit constant
 EXIT_COMMAND = 9
 
-peerManager = PeerManager()
+peer_manager = PeerManager()
 
 def get_peers():
     print("")
@@ -30,7 +30,7 @@ def change_chunk_size():
     #TODO: Implementation
 
 def exit():
-    for peer in peerManager.get_online_peers():
+    for peer in peer_manager.get_online_peers():
         connection.send_message(peer, "BYE")
     connection.stop()
     sys.exit()
@@ -92,7 +92,7 @@ def hello(peer: Peer):
     peer.set_online()
 
 def list_peers():
-    peers= peerManager.list_peers()
+    peers= peer_manager.list_peers()
     menu_peers(peers, hello)
     
 commands_functions = {
@@ -110,11 +110,11 @@ def main():
     shared_dir = sys.argv[3]
 
     global connection #TODO: Verificar se é uma boa prática e o melhor jeito de fazer isso
-    connection = Connection(address, port, peerManager)
+    connection = Connection(address, port, peer_manager)
     
     #TODO criar conexão TCP com adress e port
     try:
-        read_peers(peers_file, peerManager)
+        read_peers(peers_file, peer_manager)
         #TODO Verificar se o diretório de compartilhamento é válido 
         connection.start_server() # Após ler os peers, inicia o servidor, conforme a especificação
         menu()
