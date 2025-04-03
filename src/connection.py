@@ -17,6 +17,7 @@ class Connection:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #socket.AF_INET define o uso de protocolos IPv4
         #socket.SOCK_STREAM define o uso de TCP
+        self.clock = 0
 
     def start_server(self):
         self.socket.bind((self.address, self.port))  
@@ -78,11 +79,12 @@ class Connection:
 
     def format_message(self, message_type: str, *args) -> str:
         args_str =" " + " ".join(map(str, args)) if args else ""
-        return f"{self.address}:{self.port} CLOCK {message_type}{args_str}\n"
+        return f"{self.address}:{self.port} {self.clock} {message_type}{args_str}\n"
     
     def handle_message(self, message:str):
         message = message.removesuffix("\n")
         print(f"Resposta Recebida: {message}")
+        self.clock += 1
         message = message.split(" ")
         peer_ip, peer_port = message[0].split(":")
         print(message)
@@ -111,6 +113,7 @@ class Connection:
                 #     ou se é para fechar a conexão após receber a resposta como está sendo feito
                 print(type)
                 print(args)
+                self.clock += 1
                 message=self.format_message(type, *args)
                 print(f"Encaminhando mensagem \"{message.removesuffix("\n")}\" para {peer.ip}:{peer.port}")
                 peer_socket.send(message.encode())
