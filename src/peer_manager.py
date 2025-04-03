@@ -24,8 +24,11 @@ class PeerManager:
 
     def add_online_peer(self, ip: str, port: int) -> None:
         if self.is_peer(ip, port):
+            print(f"\tAtualizando peer {ip}:{port} status ONLINE")
             peer = self.get_peer(ip, port)
             peer.set_online()
+            return
+        print(f"\tAdicionando novo peer {ip}:{port} status ONLINE")
         self.peers[(ip, port)] = Peer(ip, port, True)
 
     def get_peer(self, ip: str, port: int) -> Peer:

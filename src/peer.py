@@ -4,6 +4,9 @@ class Peer:
         self.port = port
         self.online = online
         self.mysterious_number=mysterious_number
+    
+    def __eq__(self, value):
+        return self.ip == value.ip and self.port == value.port
 
     def describe_as_message(self):
         status = "ONLINE" if self.online else "OFFLINE"
@@ -14,8 +17,8 @@ class Peer:
 
     def set_online(self):
         self.online = True
-        print(f"Atualizando peer {self.ip}:{self.port} status ONLINE")
+        print(f"\tAtualizando peer {self.ip}:{self.port} status ONLINE")
     
     def set_offline(self):
         self.online = False
-        print(f"Atualizando peer {self.ip}:{self.port} status OFFLINE")
+        print(f"\tAtualizando peer {self.ip}:{self.port} status OFFLINE")
