@@ -9,7 +9,6 @@ class Peer:
         status = "ONLINE" if self.online else "OFFLINE"
         return f"{self.ip}:{self.port}:{status}:{self.mysterious_number}"
 
-    
     def set_mysterious_number(self, number:int):
         self.mysterious_number = number
 

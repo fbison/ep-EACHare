@@ -1,6 +1,4 @@
 import sys
-from socket import socket
-from collections import OrderedDict
 from connection import Connection
 from peer_manager import PeerManager
 from peer import Peer
@@ -27,7 +25,7 @@ def list_local_files():
         files = os.listdir(_shared_dir)
         if files:
             for file in files:
-                print(f"\t- {file}")
+                print(f"\t{file}")
     except Exception as e:
         print(f"Erro ao listar arquivos: {e}")
 

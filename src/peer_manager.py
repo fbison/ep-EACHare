@@ -33,8 +33,8 @@ class PeerManager:
     def list_peers(self) -> list[Peer]:
         return list(self.peers.values())
     
-    def list_peers_message(self) -> str:
-        return "\n".join(peer.describe_as_message() for peer in self.list_peers() if peer.describe_as_message())
+    def list_peers_message(self, sender_peer: Peer) -> str:
+        return " ".join(peer.describe_as_message() for peer in self.list_peers() if peer != sender_peer)
 
     def get_online_peers(self) -> list[Peer]:
         return [peer for peer in self.peers.values() if peer.online]

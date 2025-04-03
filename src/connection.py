@@ -62,12 +62,12 @@ class Connection:
 
     #Usar isso pra handle message
     message_type = {
-        "HELLO","PEERS_LIST", "GET_PEERS", "BYE"
+        "HELLO","PEER_LIST", "GET_PEERS", "BYE"
     }
     
-    def handle_peers_list(self, message:str):
-        peers_list_str = " ".join(message[4:])
-        peers_list = peers_list_str.split("\n")
+    def handle_peers_list(self, message:list):
+        """Lida com a lista de peers recebida de um peer."""
+        peers_list = message[4:]
         for peer in peers_list:
             peer_data = peer.split(":")
             port = int(peer_data[1])
@@ -77,23 +77,27 @@ class Connection:
             self.peer_manager.add_peer_with_details(peer_data[0], port, status, peer_data[3])
 
     def format_message(self, message_type: str, *args) -> str:
-        args_str = " ".join(map(str, args)) if args else ""
-        return f"{self.address}:{self.port} CLOCK {message_type} {args_str}"
+        args_str =" " + " ".join(map(str, args)) if args else ""
+        return f"{self.address}:{self.port} CLOCK {message_type}{args_str}\n"
     
     def handle_message(self, message:str):
+        message = message.removesuffix("\n")
         print(f"Resposta Recebida: {message}")
         message = message.split(" ")
         peer_ip, peer_port = message[0].split(":")
         print(message)
         if message[2] == "HELLO":
             self.peer_manager.add_online_peer(peer_ip, peer_port)
-        elif message[2] == "PEERS_LIST":
+        elif message[2] == "PEER_LIST":
             self.handle_peers_list(message)
         elif message[2] == "GET_PEERS":
-            self.peer_manager.add_online_peer(peer_ip, peer_port)
-            self.send_message(self.peer_manager.get_peer(peer_ip, peer_port), 
-                              "PEERS_LIST", self.peer_manager.number_of_peers(),
-                              self.peer_manager.list_peers_message())
+            self.peer_manager.add_online_peer(peer_ip, peer_port) # TODO: verificar se tem que fazer isso mesmo
+            peer = self.peer_manager.get_peer(peer_ip, peer_port)
+            list_message = self.peer_manager.list_peers_message(peer)
+            num_peers_message = len(list_message.split(" "))
+            self.send_message(peer, 
+                              "PEER_LIST", num_peers_message,
+                              list_message)
         elif message[2] == "BYE":
             self.peer_manager.get_peer(peer_ip, peer_port).set_offline()
         else:
@@ -108,12 +112,13 @@ class Connection:
                 print(type)
                 print(args)
                 message=self.format_message(type, *args)
-                print(f"Encaminhando mensagem {message} para {peer.ip}:{peer.port}")
+                print(f"Encaminhando mensagem \"{message.removesuffix("\n")}\" para {peer.ip}:{peer.port}")
                 peer_socket.send(message.encode())
                 peer.set_online()
                 #TODO Verificar se é necessário fechar a conexão após receber a resposta
         except Exception as e:
             print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
+            peer.set_offline()
 
     def stop(self):
         self.running = False
