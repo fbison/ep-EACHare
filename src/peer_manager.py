@@ -13,6 +13,7 @@ class PeerManager:
         if self.is_peer(ip, port):
             return
         self.peers[(ip, port)] = Peer(ip, port)
+        print(f"Adicionando novo peer {ip}:{port} status OFFLINE")
     
     def add_peer_with_details(self, ip: str, port: int, online: bool, mysterious_number: int) -> None:
         if self.is_peer(ip, port):

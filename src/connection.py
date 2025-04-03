@@ -22,9 +22,6 @@ class Connection:
     def start_server(self):
         self.socket.bind((self.address, self.port))  
         self.socket.listen(MAX_CONNECTIONS)  # Máximo de conexões na fila
-        #TODO verificar o valor adequado para MAX_CONNECTIONS
-        #TODO Retirar esse print após testes
-        print(f"Peer ativo em {self.address}:{self.port}")
         self.running = True  # Controle da execução
 
         # Inicia um thread daemon para aceitar conexões,
