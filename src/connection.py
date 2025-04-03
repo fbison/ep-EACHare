@@ -80,11 +80,16 @@ class Connection:
     def format_message(self, message_type: str, *args) -> str:
         args_str =" " + " ".join(map(str, args)) if args else ""
         return f"{self.address}:{self.port} {self.clock} {message_type}{args_str}\n"
+
+    def increment_clock(self):
+        """Incrementa o relógio lógico."""
+        self.clock += 1
+        print(f"=> Atualizando relógio para {self.clock}")
     
     def handle_message(self, message:str):
         message = message.removesuffix("\n")
         print(f"Resposta Recebida: {message}")
-        self.clock += 1
+        self.increment_clock()
         message = message.split(" ")
         peer_ip, peer_port = message[0].split(":")
         print(message)
@@ -113,7 +118,7 @@ class Connection:
                 #     ou se é para fechar a conexão após receber a resposta como está sendo feito
                 print(type)
                 print(args)
-                self.clock += 1
+                self.increment_clock()
                 message=self.format_message(type, *args)
                 print(f"Encaminhando mensagem \"{message.removesuffix("\n")}\" para {peer.ip}:{peer.port}")
                 peer_socket.send(message.encode())
