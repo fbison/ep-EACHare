@@ -84,7 +84,7 @@ class Connection:
         print(f"=> Atualizando relógio para {self.clock}")
     
     def handle_message(self, message:str):
-        message = message.removesuffix("\n")
+        message = message.strip()
         print(f"Resposta Recebida: {message}")
         self.increment_clock()
         message = message.split(" ")
@@ -117,7 +117,7 @@ class Connection:
                 print(args)
                 self.increment_clock()
                 message=self.format_message(type, *args)
-                print(f"Encaminhando mensagem \"{message.removesuffix("\n")}\" para {peer.ip}:{peer.port}")
+                print(f"Encaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
                 peer_socket.send(message.encode())
                 peer.set_online()
                 #TODO Verificar se é necessário fechar a conexão após receber a resposta
