@@ -17,13 +17,11 @@ class Connection:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #socket.AF_INET define o uso de protocolos IPv4
         #socket.SOCK_STREAM define o uso de TCP
+        self.clock = 0
 
     def start_server(self):
         self.socket.bind((self.address, self.port))  
         self.socket.listen(MAX_CONNECTIONS)  # Máximo de conexões na fila
-        #TODO verificar o valor adequado para MAX_CONNECTIONS
-        #TODO Retirar esse print após testes
-        print(f"Peer ativo em {self.address}:{self.port}")
         self.running = True  # Controle da execução
 
         # Inicia um thread daemon para aceitar conexões,
@@ -37,8 +35,6 @@ class Connection:
             try:
                 client_socket, client_address = self.socket.accept() 
                 #self.socket.accept() Bloqueia a execução da thread até receber uma conexão
-                print(f"Conexão recebida de {client_address}") #TODO Retirar esse print após testes
-
                 # Inicia um thread para tratar essa conexão
                 thread = threading.Thread(target=self.handle_client, args=(client_socket,))
                 thread.start()
@@ -65,9 +61,9 @@ class Connection:
         "HELLO","PEER_LIST", "GET_PEERS", "BYE"
     }
     
-    def handle_peers_list(self, message:list):
+    def handle_peers_list(self, message_list:list):
         """Lida com a lista de peers recebida de um peer."""
-        peers_list = message[4:]
+        peers_list = message_list[4:]
         for peer in peers_list:
             peer_data = peer.split(":")
             port = int(peer_data[1])
@@ -78,29 +74,41 @@ class Connection:
 
     def format_message(self, message_type: str, *args) -> str:
         args_str =" " + " ".join(map(str, args)) if args else ""
-        return f"{self.address}:{self.port} CLOCK {message_type}{args_str}\n"
+        return f"{self.address}:{self.port} {self.clock} {message_type}{args_str}\n"
+
+    def increment_clock(self):
+        """Incrementa o relógio lógico."""
+        self.clock += 1
+        print(f"\t=> Atualizando relogio para {self.clock}")
     
     def handle_message(self, message:str):
-        message = message.removesuffix("\n")
-        print(f"Resposta Recebida: {message}")
-        message = message.split(" ")
-        peer_ip, peer_port = message[0].split(":")
-        print(message)
-        if message[2] == "HELLO":
+        message = message.strip()
+        message_list = message.split(" ")
+        peer_ip, peer_port = message_list[0].split(":")
+        peer_port = int(peer_port)
+        if message_list[2] == "HELLO":
+            print(f"\tMensagem recebida: \"{message}\"")
+            self.increment_clock()
             self.peer_manager.add_online_peer(peer_ip, peer_port)
-        elif message[2] == "PEER_LIST":
-            self.handle_peers_list(message)
-        elif message[2] == "GET_PEERS":
+        elif message_list[2] == "PEER_LIST":
+            print(f"\tResposta recebida: \"{message}\"")
+            self.increment_clock()
+            self.handle_peers_list(message_list)
+        elif message_list[2] == "GET_PEERS":
             self.peer_manager.add_online_peer(peer_ip, peer_port) # TODO: verificar se tem que fazer isso mesmo
             peer = self.peer_manager.get_peer(peer_ip, peer_port)
             list_message = self.peer_manager.list_peers_message(peer)
             num_peers_message = len(list_message.split(" "))
+            self.increment_clock()
             self.send_message(peer, 
                               "PEER_LIST", num_peers_message,
                               list_message)
-        elif message[2] == "BYE":
+        elif message_list[2] == "BYE":
+            print(f"\tMensagem recebida: \"{message}\"")
+            self.increment_clock()
             self.peer_manager.get_peer(peer_ip, peer_port).set_offline()
         else:
+            self.increment_clock()
             print("Mensagem desconhecida")
 
     def send_message(self, peer: Peer, type: str, *args): #TODO verificar se type não é uma palavra reservada
@@ -109,10 +117,9 @@ class Connection:
             with socket.create_connection((peer.ip, int(peer.port)), timeout=TIMEOUT_CONNECTION) as peer_socket:
                 #TODO Verificar com o professor sobre deixar a conexão aberta após receber um HELLO,
                 #     ou se é para fechar a conexão após receber a resposta como está sendo feito
-                print(type)
-                print(args)
+                self.increment_clock()
                 message=self.format_message(type, *args)
-                print(f"Encaminhando mensagem \"{message.removesuffix("\n")}\" para {peer.ip}:{peer.port}")
+                print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
                 peer_socket.send(message.encode())
                 peer.set_online()
                 #TODO Verificar se é necessário fechar a conexão após receber a resposta

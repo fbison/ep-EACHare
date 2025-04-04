@@ -85,9 +85,10 @@ def read_peers(peers_file: str, peer_manager: PeerManager) -> None:
 
 def menu_peers(peers: list[Peer], function: callable) -> None:
     while True:
-        print("\t [0] voltar para o menu anterior")
+        print("Lista de peers:")
+        print("\t[0] voltar para o menu anterior")
         for index, peer in enumerate(peers, start=1):
-            print(f"\t [{index}] {peer.ip}:{peer.port} {'ONLINE' if peer.online else 'OFFLINE'}")
+            print(f"\t[{index}] {peer.ip}:{peer.port} {'ONLINE' if peer.online else 'OFFLINE'}")
         command_number = int(input(">"))
         if command_number == 0:
             break
