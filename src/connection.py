@@ -48,7 +48,6 @@ class Connection:
             while self.running:
                 data = client_socket.recv(1024).decode()
                 if not data:
-                    #TODO adicionar um handle message que trata todo tipo de mensagem
                     break
                 self.handle_message(data)
         except Exception as e:
@@ -61,17 +60,6 @@ class Connection:
         "HELLO","PEER_LIST", "GET_PEERS", "BYE"
     }
     
-    def handle_peers_list(self, message_list:list):
-        """Lida com a lista de peers recebida de um peer."""
-        peers_list = message_list[4:]
-        for peer in peers_list:
-            peer_data = peer.split(":")
-            port = int(peer_data[1])
-            if(self.address == peer_data[0] and self.port == port):
-                continue
-            status = True if peer_data[3] == "ONLINE" else False
-            self.peer_manager.add_peer_with_details(peer_data[0], port, status, peer_data[3])
-
     def format_message(self, message_type: str, *args) -> str:
         args_str =" " + " ".join(map(str, args)) if args else ""
         return f"{self.address}:{self.port} {self.clock} {message_type}{args_str}\n"
@@ -93,7 +81,7 @@ class Connection:
         elif message_list[2] == "PEER_LIST":
             print(f"\tResposta recebida: \"{message}\"")
             self.increment_clock()
-            self.handle_peers_list(message_list)
+            self.peer_manager.handle_peers_list(message_list, self.address, self.port)
         elif message_list[2] == "GET_PEERS":
             self.peer_manager.add_online_peer(peer_ip, peer_port) # TODO: verificar se tem que fazer isso mesmo
             peer = self.peer_manager.get_peer(peer_ip, peer_port)

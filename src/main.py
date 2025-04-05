@@ -127,13 +127,11 @@ def main():
     peers_file = sys.argv[2]
     verify_shared_dir(sys.argv[3])
 
-    global connection #TODO: Verificar se é uma boa prática e o melhor jeito de fazer isso
+    global connection 
     connection = Connection(address, port, peer_manager)
-    
-    #TODO criar conexão TCP com adress e port
+
     try:
         read_peers(peers_file, peer_manager)
-        #TODO Verificar se o diretório de compartilhamento é válido 
         connection.start_server() # Após ler os peers, inicia o servidor, conforme a especificação
         menu()
     except RuntimeError as error:

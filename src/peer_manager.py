@@ -45,3 +45,15 @@ class PeerManager:
     
     def number_of_peers(self) -> int:
         return len(self.peers)
+    
+    def handle_peers_list(self, message_list:list, receiver_address:str, receiver_port:int) -> None:
+        """Lida com a lista de peers recebida de um peer."""
+        peers_list = message_list[4:]
+        for peer in peers_list:
+            peer_data = peer.split(":")
+            port = int(peer_data[1])
+            if(receiver_address == peer_data[0] and receiver_port == port):
+                continue
+            status = True if peer_data[3] == "ONLINE" else False
+            self.add_peer_with_details(peer_data[0], port, status, peer_data[3])
+
