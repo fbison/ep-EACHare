@@ -13,7 +13,6 @@ class Connection:
         self.port = int(port)
         self.peer_manager = peer_manager
         self.running = False
-        self.threads = []
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #socket.AF_INET define o uso de protocolos IPv4
         #socket.SOCK_STREAM define o uso de TCP
@@ -38,7 +37,6 @@ class Connection:
                 # Inicia um thread para tratar essa conexão
                 thread = threading.Thread(target=self.handle_client, args=(client_socket,))
                 thread.start()
-                self.threads.append(thread)
             except Exception as e:
                 print(f"Erro ao aceitar conexão: {e}")
 
@@ -130,6 +128,4 @@ class Connection:
     def stop(self):
         self.running = False
         self.socket.close()
-        for thread in self.threads:
-            thread.join() # Espera as threads terminarem
         print("Saindo...")
