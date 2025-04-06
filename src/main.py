@@ -13,7 +13,8 @@ def hello(peer: Peer):
     connection.send_message(peer, "HELLO")
 
 def get_peers():
-    for peer in peer_manager.list_peers():
+    peers = peer_manager.list_peers()
+    for peer in peers:
         connection.send_message(peer, "GET_PEERS")
 
 def list_local_files():

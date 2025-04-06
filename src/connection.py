@@ -17,6 +17,7 @@ class Connection:
         #socket.AF_INET define o uso de protocolos IPv4
         #socket.SOCK_STREAM define o uso de TCP
         self.clock = 0
+        self.lock = threading.Lock() # Cria um lock para controlar o acesso ao clock
 
     def start_server(self):
         self.socket.bind((self.address, self.port))  
@@ -76,8 +77,9 @@ class Connection:
 
     def increment_clock(self):
         """Incrementa o relógio lógico."""
-        self.clock += 1
-        print(f"\t=> Atualizando relogio para {self.clock}")
+        with self.lock:
+            self.clock += 1
+            print(f"\t=> Atualizando relogio para {self.clock}")
     
     def handle_message(self, message:str):
         message = message.strip()
@@ -93,6 +95,7 @@ class Connection:
             self.increment_clock()
             self.handle_peers_list(message_list)
         elif message_list[2] == "GET_PEERS":
+            print(f"\tMensagem recebida: \"{message}\"")
             self.peer_manager.add_online_peer(peer_ip, peer_port) # TODO: verificar se tem que fazer isso mesmo
             peer = self.peer_manager.get_peer(peer_ip, peer_port)
             list_message = self.peer_manager.list_peers_message(peer)
@@ -119,7 +122,7 @@ class Connection:
                 message=self.format_message(type, *args)
                 print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
                 peer_socket.send(message.encode())
-                peer.set_online()
+            peer.set_online()
                 #TODO Verificar se é necessário fechar a conexão após receber a resposta
         except Exception as e:
             print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
