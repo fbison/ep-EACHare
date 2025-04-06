@@ -1,7 +1,7 @@
 import sys
-from connection import Connection
-from peer_manager import PeerManager
-from peer import Peer
+from eachare_app.connection import Connection
+from eachare_app.peer_manager import PeerManager
+from eachare_app.peer import Peer
 import os
 # Exit constant
 EXIT_COMMAND = 9
@@ -124,6 +124,10 @@ def verify_shared_dir(shared_dir: str) -> None:
     _shared_dir = shared_dir
 
 def main():
+    if len(sys.argv) != 4:
+        print("Uso: ./eachare <endereço:porta> <vizinhos.txt> <diretorio_compartilhado>")
+        sys.exit(1)
+
     address, port = sys.argv[1].split(':')
     peers_file = sys.argv[2]
     verify_shared_dir(sys.argv[3])

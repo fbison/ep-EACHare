@@ -1,7 +1,8 @@
 import socket
 import threading
-from peer import Peer
-from peer_manager import PeerManager
+
+from eachare_app.peer import Peer
+from eachare_app.peer_manager import PeerManager
 
 MAX_CONNECTIONS = int(5)
 TIMEOUT_CONNECTION = int(5) # Diminui o tempo de espera para uma conexão offline

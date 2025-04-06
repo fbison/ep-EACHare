@@ -1,4 +1,4 @@
-from peer import Peer
+from eachare_app.peer import Peer
 from threading import Lock
 
 class PeerManager:
