@@ -40,7 +40,8 @@ class Connection:
                 thread = threading.Thread(target=self.handle_client, args=(client_socket,))
                 thread.start()
             except Exception as e:
-                print(f"Erro ao aceitar conexão: {e}")
+                if self.running:  # Apenas imprime o erro se o servidor ainda estiver rodando
+                    print(f"Erro ao aceitar conexão: {e}")
 
     def handle_client(self, client_socket):
         """Lida com mensagens recebidas de um peer."""
