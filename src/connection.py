@@ -44,11 +44,8 @@ class Connection:
     def handle_client(self, client_socket):
         """Lida com mensagens recebidas de um peer."""
         try:
-            while self.running:
-                data = client_socket.recv(1024).decode()
-                if not data:
-                    #TODO adicionar um handle message que trata todo tipo de mensagem
-                    break
+            data = client_socket.recv(1024).decode()
+            if data: 
                 self.handle_message(data)
         except Exception as e:
             print(f"Erro ao lidar com cliente: {e}")
@@ -112,18 +109,15 @@ class Connection:
             self.increment_clock()
             print("Mensagem desconhecida")
 
-    def send_message(self, peer: Peer, type: str, *args): #TODO verificar se type não é uma palavra reservada
+    def send_message(self, peer: Peer, type: str, *args): 
         #Conecta-se com um peer para o envio de uma mensagem, toda mensagem cria uma nova conexão
         try:
             with socket.create_connection((peer.ip, int(peer.port)), timeout=TIMEOUT_CONNECTION) as peer_socket:
-                #TODO Verificar com o professor sobre deixar a conexão aberta após receber um HELLO,
-                #     ou se é para fechar a conexão após receber a resposta como está sendo feito
                 self.increment_clock()
                 message=self.format_message(type, *args)
                 print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
                 peer_socket.send(message.encode())
             peer.set_online()
-                #TODO Verificar se é necessário fechar a conexão após receber a resposta
         except Exception as e:
             print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
             peer.set_offline()
