@@ -1,7 +1,8 @@
 import socket
 import threading
-from peer import Peer
-from peer_manager import PeerManager
+
+from eachare_app.peer import Peer
+from eachare_app.peer_manager import PeerManager
 
 MAX_CONNECTIONS = int(5)
 TIMEOUT_CONNECTION = int(5) # Diminui o tempo de espera para uma conexão offline
@@ -13,11 +14,11 @@ class Connection:
         self.port = int(port)
         self.peer_manager = peer_manager
         self.running = False
-        self.threads = []
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #socket.AF_INET define o uso de protocolos IPv4
         #socket.SOCK_STREAM define o uso de TCP
         self.clock = 0
+        self.lock = threading.Lock() # Cria um lock para controlar o acesso ao clock
 
     def start_server(self):
         self.socket.bind((self.address, self.port))  
@@ -38,17 +39,14 @@ class Connection:
                 # Inicia um thread para tratar essa conexão
                 thread = threading.Thread(target=self.handle_client, args=(client_socket,))
                 thread.start()
-                self.threads.append(thread)
             except Exception as e:
                 print(f"Erro ao aceitar conexão: {e}")
 
     def handle_client(self, client_socket):
         """Lida com mensagens recebidas de um peer."""
         try:
-            while self.running:
-                data = client_socket.recv(1024).decode()
-                if not data:
-                    break
+            data = client_socket.recv(1024).decode()
+            if data: 
                 self.handle_message(data)
         except Exception as e:
             print(f"Erro ao lidar com cliente: {e}")
@@ -66,8 +64,9 @@ class Connection:
 
     def increment_clock(self):
         """Incrementa o relógio lógico."""
-        self.clock += 1
-        print(f"\t=> Atualizando relogio para {self.clock}")
+        with self.lock:
+            self.clock += 1
+            print(f"\t=> Atualizando relogio para {self.clock}")
     
     def handle_message(self, message:str):
         message = message.strip()
@@ -83,6 +82,7 @@ class Connection:
             self.increment_clock()
             self.peer_manager.handle_peers_list(message_list, self.address, self.port)
         elif message_list[2] == "GET_PEERS":
+            print(f"\tMensagem recebida: \"{message}\"")
             self.peer_manager.add_online_peer(peer_ip, peer_port) # TODO: verificar se tem que fazer isso mesmo
             peer = self.peer_manager.get_peer(peer_ip, peer_port)
             list_message = self.peer_manager.list_peers_message(peer)
@@ -99,18 +99,15 @@ class Connection:
             self.increment_clock()
             print("Mensagem desconhecida")
 
-    def send_message(self, peer: Peer, type: str, *args): #TODO verificar se type não é uma palavra reservada
+    def send_message(self, peer: Peer, type: str, *args): 
         #Conecta-se com um peer para o envio de uma mensagem, toda mensagem cria uma nova conexão
         try:
             with socket.create_connection((peer.ip, int(peer.port)), timeout=TIMEOUT_CONNECTION) as peer_socket:
-                #TODO Verificar com o professor sobre deixar a conexão aberta após receber um HELLO,
-                #     ou se é para fechar a conexão após receber a resposta como está sendo feito
                 self.increment_clock()
                 message=self.format_message(type, *args)
                 print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
                 peer_socket.send(message.encode())
-                peer.set_online()
-                #TODO Verificar se é necessário fechar a conexão após receber a resposta
+            peer.set_online()
         except Exception as e:
             print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
             peer.set_offline()
@@ -118,6 +115,4 @@ class Connection:
     def stop(self):
         self.running = False
         self.socket.close()
-        for thread in self.threads:
-            thread.join() # Espera as threads terminarem
         print("Saindo...")
