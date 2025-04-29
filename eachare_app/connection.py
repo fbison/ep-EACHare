@@ -34,7 +34,7 @@ class Connection:
         """Aceita conexões de outros peers e gerencia as requisições."""
         while self.running:
             try:
-                client_socket, client_address = self.socket.accept() 
+                client_socket, _ = self.socket.accept() 
                 #self.socket.accept() Bloqueia a execução da thread até receber uma conexão
                 # Inicia um thread para tratar essa conexão
                 thread = threading.Thread(target=self.handle_client, args=(client_socket,))
@@ -46,19 +46,24 @@ class Connection:
     def handle_client(self, client_socket):
         """Lida com mensagens recebidas de um peer."""
         try:
-            data = client_socket.recv(1024).decode()
-            if data: 
-                self.handle_message(data)
+            buffer = ""
+            while True:
+                chunk = client_socket.recv(1024).decode()
+                if not chunk:
+                    # Conexão foi encerrada pelo peer antes de chegar o \n, ou seja, não é uma mensagem completa
+                    break
+                buffer += chunk
+                if '\n' in buffer:
+                    message = buffer.split('\n', 1)[0]  # Verifica que a mensagem é finalizada no \n
+                    self.handle_message(message.strip(), client_socket)
+                    #Impede que chegue no finally e feche o socket antes de enviar a resposta
+                    #Será fechada por quem recebeu a conexão
+                    return 
         except Exception as e:
             print(f"Erro ao lidar com cliente: {e}")
-        finally:
+            #TODO REMOVER LOG
             client_socket.close()
-
-    #Usar isso pra handle message
-    message_type = {
-        "HELLO","PEER_LIST", "GET_PEERS", "BYE"
-    }
-    
+       
     def format_message(self, message_type: str, *args) -> str:
         args_str =" " + " ".join(map(str, args)) if args else ""
         return f"{self.address}:{self.port} {self.clock} {message_type}{args_str}\n"
@@ -68,50 +73,111 @@ class Connection:
         with self.lock:
             self.clock += 1
             print(f"\t=> Atualizando relogio para {self.clock}")
+
     
-    def handle_message(self, message:str):
+    def update_clock(self, peer_clock:int):
+        """Atualiza o relógio lógico com o valor do peer."""
+        with self.lock:
+            self.clock = max(self.clock, peer_clock) + 1
+            print(f"\t=> Atualizando relogio para {self.clock}")
+
+    def get_peers_response_args(self, peer_ip, peer_port):
+        peer = self.peer_manager.get_peer(peer_ip, peer_port)
+        list_message = self.peer_manager.list_peers_message(peer)
+        num_peers_message = len(list_message.split(" "))
+        return peer, num_peers_message, list_message
+    
+    message_type = {
+        "HELLO","PEER_LIST", "GET_PEERS", "BYE"
+    }
+
+    def handle_message(self, message:str, client_socket:socket.socket):
         message = message.strip()
         message_list = message.split(" ")
         peer_ip, peer_port = message_list[0].split(":")
         peer_port = int(peer_port)
-        if message_list[2] == "HELLO":
-            print(f"\tMensagem recebida: \"{message}\"")
-            self.increment_clock()
-            self.peer_manager.add_online_peer(peer_ip, peer_port)
-        elif message_list[2] == "PEER_LIST":
-            print(f"\tResposta recebida: \"{message}\"")
-            self.increment_clock()
-            self.peer_manager.handle_peers_list(message_list, self.address, self.port)
-        elif message_list[2] == "GET_PEERS":
-            print(f"\tMensagem recebida: \"{message}\"")
-            self.peer_manager.add_online_peer(peer_ip, peer_port) # TODO: verificar se tem que fazer isso mesmo
-            peer = self.peer_manager.get_peer(peer_ip, peer_port)
-            list_message = self.peer_manager.list_peers_message(peer)
-            num_peers_message = len(list_message.split(" "))
-            self.increment_clock()
-            self.send_message(peer, 
-                              "PEER_LIST", num_peers_message,
-                              list_message)
-        elif message_list[2] == "BYE":
-            print(f"\tMensagem recebida: \"{message}\"")
-            self.increment_clock()
-            self.peer_manager.get_peer(peer_ip, peer_port).set_offline()
-        else:
-            self.increment_clock()
-            print("Mensagem desconhecida")
 
-    def send_message(self, peer: Peer, type: str, *args): 
+        if message_list[2] not in self.message_type:
+            print(f"\tMensagem desconhecida: \"{message}\"")
+            return
+        
+        # Atualiza o relógio lógico com o valor do peer
+
+        self.update_clock(int(message_list[1]))
+
+        # Trata Respostas
+        if message_list[2] == "PEER_LIST":
+            print(f"\tResposta recebida: \"{message}\"")
+            self.peer_manager.handle_peers_list(message_list, self.address, self.port)
+            return
+        
+        # Trata Requisições
+        print(f"\tMensagem recebida: \"{message}\"")
+
+        if message_list[2] == "GET_PEERS":
+            self.peer_manager.add_online_peer(peer_ip, peer_port)
+            peer, num_peers_message, list_message = self.get_peers_response_args(peer_ip, peer_port)
+            self.send_answer(peer, client_socket, "PEER_LIST", num_peers_message, list_message)
+            return
+        
+        client_socket.close() # Como as mensagens abaixo não tem resposta, fecha o socket
+
+        if message_list[2] == "HELLO":
+            self.peer_manager.add_online_peer(peer_ip, peer_port)
+            return
+        
+        
+        if message_list[2] == "BYE":
+            self.peer_manager.get_peer(peer_ip, peer_port).set_offline()
+            
+    def receive_response(self, sock):
+        buffer = ""
+        while True:
+            chunk = sock.recv(1024).decode()
+            if not chunk:
+                break
+            buffer += chunk
+            if '\n' in buffer:
+                break
+        return buffer.strip()
+
+    def send_message(self, peer: Peer, type: str, *args, waitForAnswer:bool = False): 
         #Conecta-se com um peer para o envio de uma mensagem, toda mensagem cria uma nova conexão
+        peer_socket = None  # Inicializa como None para evitar problemas se a conexão falhar
         try:
-            with socket.create_connection((peer.ip, int(peer.port)), timeout=TIMEOUT_CONNECTION) as peer_socket:
-                self.increment_clock()
-                message=self.format_message(type, *args)
-                print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
-                peer_socket.send(message.encode())
+            peer_socket = socket.create_connection((peer.ip, int(peer.port)), timeout=TIMEOUT_CONNECTION)
+            self.increment_clock()
+            message = self.format_message(type, *args)
+            print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
+            peer_socket.sendall(message.encode())
             peer.set_online()
+
+            if waitForAnswer:
+                response = self.receive_response(peer_socket)
+                self.handle_message(response, peer_socket)
+
         except Exception as e:
             print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
             peer.set_offline()
+
+        finally:
+            if peer_socket:
+                peer_socket.close()
+    
+    def send_answer(self, peer: Peer, client_socket: socket.socket, type: str, *args):
+        #Envia uma mensagem pela conexão já estabelecida (resposta direta)
+        try:
+            self.increment_clock()
+            message = self.format_message(type, *args)
+            print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
+            client_socket.sendall(message.encode())
+        except Exception as e:
+            print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
+            peer.set_offline()
+        finally:
+            client_socket.close()
+            
+            # Fecha o socket após enviar a resposta, pois não é mais necessária a conexão
 
     def stop(self):
         self.running = False

@@ -15,7 +15,7 @@ def hello(peer: Peer):
 def get_peers():
     peers = peer_manager.list_peers()
     for peer in peers:
-        connection.send_message(peer, "GET_PEERS")
+        connection.send_message(peer, "GET_PEERS", waitForAnswer=True)
 
 def list_local_files():
     if not _shared_dir:
