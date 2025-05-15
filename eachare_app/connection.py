@@ -101,18 +101,20 @@ class Connection:
             print(f"\tMensagem desconhecida: \"{message}\"")
             return
         
-        # Atualiza o relógio lógico com o valor do peer
-
-        self.update_clock(int(message_list[1]))
-
         # Trata Respostas
         if message_list[2] == "PEER_LIST":
             print(f"\tResposta recebida: \"{message}\"")
+            # Atualiza o relógio lógico com o valor do peer
+            self.update_clock(int(message_list[1]))
+
             self.peer_manager.handle_peers_list(message_list, self.address, self.port)
             return
         
         # Trata Requisições
         print(f"\tMensagem recebida: \"{message}\"")
+
+        # Atualiza o relógio lógico com o valor do peer
+        self.update_clock(int(message_list[1]))
 
         if message_list[2] == "GET_PEERS":
             self.peer_manager.add_online_peer(peer_ip, peer_port)
