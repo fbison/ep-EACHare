@@ -15,15 +15,16 @@ class PeerManager:
             self.peers[(ip, port)] = Peer(ip, port)
         print(f"Adicionando novo peer {ip}:{port} status OFFLINE")
     
-    def add_peer_with_details(self, ip: str, port: int, online: bool, mysterious_number: int) -> None:
+    def add_peer_with_details(self, ip: str, port: int, online: bool, clock: int) -> None:
         with self.lock:
             peer = self.peers.get((ip, port))
             if not peer:
-                self.peers[(ip, port)] = Peer(ip, port, online=online, mysterious_number=mysterious_number)
+                self.peers[(ip, port)] = Peer(ip, port, online=online, clock=clock)
                 return
         # Perform operations on the peer outside the lock
-        peer.set_online() if online else peer.set_offline()
-        peer.set_mysterious_number(mysterious_number)
+        if clock > peer.clock:
+            peer.set_online() if online else peer.set_offline()
+            peer.set_clock(clock)
 
     def add_online_peer(self, ip: str, port: int) -> None:
         with self.lock:
@@ -66,6 +67,7 @@ class PeerManager:
             port = int(peer_data[1])
             if(receiver_address == peer_data[0] and receiver_port == port):
                 continue
-            status = True if peer_data[3] == "ONLINE" else False
-            self.add_peer_with_details(peer_data[0], port, status, peer_data[3])
+            status = True if peer_data[2] == "ONLINE" else False
+            clock = int(peer_data[3])
+            self.add_peer_with_details(peer_data[0], port, status, clock)
 

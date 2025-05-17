@@ -41,7 +41,7 @@ class Connection:
                 thread.start()
             except Exception as e:
                 if self.running:  # Apenas imprime o erro se o servidor ainda estiver rodando
-                    print(f"Erro ao aceitar conexão: {e}")
+                    pass
 
     def handle_client(self, client_socket):
         """Lida com mensagens recebidas de um peer."""
@@ -60,8 +60,6 @@ class Connection:
                     #Será fechada por quem recebeu a conexão
                     return 
         except Exception as e:
-            print(f"Erro ao lidar com cliente: {e}")
-            #TODO REMOVER LOG
             client_socket.close()
        
     def format_message(self, message_type: str, *args) -> str:
@@ -72,17 +70,20 @@ class Connection:
         """Incrementa o relógio lógico."""
         with self.lock:
             self.clock += 1
-            print(f"\t=> Atualizando relogio para {self.clock}")
 
     
     def update_clock(self, peer_clock:int):
         """Atualiza o relógio lógico com o valor do peer."""
         with self.lock:
             self.clock = max(self.clock, peer_clock) + 1
-            print(f"\t=> Atualizando relogio para {self.clock}")
 
     def get_peers_response_args(self, peer_ip, peer_port):
-        peer = self.peer_manager.get_peer(peer_ip, peer_port)
+        # Verifica se o peer já existe, se não existir adiciona
+        try:
+            peer = self.peer_manager.get_peer(peer_ip, peer_port)
+        except KeyError:
+            self.peer_manager.add_peer(peer_ip, peer_port)
+            peer = self.peer_manager.get_peer(peer_ip, peer_port)
         list_message = self.peer_manager.list_peers_message(peer)
         num_peers_message = len(list_message.split(" "))
         return peer, num_peers_message, list_message
@@ -96,28 +97,36 @@ class Connection:
         message_list = message.split(" ")
         peer_ip, peer_port = message_list[0].split(":")
         peer_port = int(peer_port)
+        clock = int(message_list[1])
 
         if message_list[2] not in self.message_type:
-            print(f"\tMensagem desconhecida: \"{message}\"")
             return
+        
+        # Atualiza o clock do peer que enviou a mensagem
+        try:
+            peer = self.peer_manager.get_peer(peer_ip, peer_port)
+        except KeyError:
+            self.peer_manager.add_peer(peer_ip, peer_port)
+            peer = self.peer_manager.get_peer(peer_ip, peer_port)
+        # Seta o peer como online por padrão
+        peer.set_online()
+        if clock > peer.clock:
+            peer.set_clock(clock)
         
         # Trata Respostas
         if message_list[2] == "PEER_LIST":
-            print(f"\tResposta recebida: \"{message}\"")
             # Atualiza o relógio lógico com o valor do peer
-            self.update_clock(int(message_list[1]))
+            self.update_clock(clock)
 
             self.peer_manager.handle_peers_list(message_list, self.address, self.port)
             return
         
         # Trata Requisições
-        print(f"\tMensagem recebida: \"{message}\"")
 
         # Atualiza o relógio lógico com o valor do peer
-        self.update_clock(int(message_list[1]))
+        self.update_clock(clock)
 
         if message_list[2] == "GET_PEERS":
-            self.peer_manager.add_online_peer(peer_ip, peer_port)
             peer, num_peers_message, list_message = self.get_peers_response_args(peer_ip, peer_port)
             self.send_answer(peer, client_socket, "PEER_LIST", num_peers_message, list_message)
             return
@@ -125,12 +134,11 @@ class Connection:
         client_socket.close() # Como as mensagens abaixo não tem resposta, fecha o socket
 
         if message_list[2] == "HELLO":
-            self.peer_manager.add_online_peer(peer_ip, peer_port)
             return
         
         
         if message_list[2] == "BYE":
-            self.peer_manager.get_peer(peer_ip, peer_port).set_offline()
+            peer.set_offline()
             
     def receive_response(self, sock):
         buffer = ""
@@ -150,7 +158,6 @@ class Connection:
             peer_socket = socket.create_connection((peer.ip, int(peer.port)), timeout=TIMEOUT_CONNECTION)
             self.increment_clock()
             message = self.format_message(type, *args)
-            print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
             peer_socket.sendall(message.encode())
             peer.set_online()
 
@@ -159,7 +166,6 @@ class Connection:
                 self.handle_message(response, peer_socket)
 
         except Exception as e:
-            print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
             peer.set_offline()
 
         finally:
@@ -171,10 +177,8 @@ class Connection:
         try:
             self.increment_clock()
             message = self.format_message(type, *args)
-            print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
             client_socket.sendall(message.encode())
         except Exception as e:
-            print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
             peer.set_offline()
         finally:
             client_socket.close()
@@ -184,4 +188,3 @@ class Connection:
     def stop(self):
         self.running = False
         self.socket.close()
-        print("Saindo...")
