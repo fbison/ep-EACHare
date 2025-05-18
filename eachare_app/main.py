@@ -62,6 +62,8 @@ def search_files():
         print("Escolha inválida.")
         return
     nome, tamanho, peer_addr = arquivos[choice - 1]
+    print(f"arquivo escolhido {nome}")
+
     peer_ip, peer_port = peer_addr.split(":")
     peer_port = int(peer_port)
     peer = peer_manager.get_peer(peer_ip, peer_port)
