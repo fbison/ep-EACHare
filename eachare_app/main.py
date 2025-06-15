@@ -74,8 +74,12 @@ def show_statistics():
     #TODO: Implementation
 
 def change_chunk_size():
-    print("")
-    #TODO: Implementation
+    print("Digite novo tamanho do chunk:")
+    new_size = int(input(">"))
+    if new_size <= 0:
+        print("Tamanho inválido. Deve ser um número positivo.")
+        return
+    connection.change_chunk_size(new_size)
 
 def exit():
     for peer in peer_manager.get_online_peers():

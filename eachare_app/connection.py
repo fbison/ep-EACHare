@@ -85,6 +85,13 @@ class Connection:
             self.clock = max(self.clock, peer_clock) + 1
             print(f"\t=> Atualizando relogio para {self.clock}")
 
+    def change_chunk_size(self, new_size: int):
+        """Altera o tamanho do chunk usado nos downloads."""
+        if new_size <= 0:
+            raise ValueError("O tamanho do chunk deve ser maior que zero.")
+        self.chunk_size = new_size
+        print("\tTamanho do chunk alterado:", self.chunk_size)
+
     def get_peers_response_args(self, peer_ip, peer_port):
         # Verifica se o peer já existe, se não existir adiciona
         try:
