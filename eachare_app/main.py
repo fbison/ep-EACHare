@@ -36,23 +36,25 @@ def search_files():
     if not peers:
         print("Nenhum peer online para buscar arquivos.")
         return
-    connection.ls_results = []
+    connection.ls_results = [] # Limpa resultados de buscas anteriores
     for peer in peers:
         connection.send_message(peer, "LS", waitForAnswer=True)
     # Exibe menu de arquivos encontrados
-    arquivos = []
+    arquivos = {}
     for ip, port, files in connection.ls_results:
         for file_info in files:
             if ':' in file_info:
                 nome, tamanho = file_info.split(":", 1)
             else:
                 nome, tamanho = file_info, '0'
-            arquivos.append((nome, tamanho, f"{ip}:{port}"))
+            arquivos.setdefault((nome, tamanho), []).append(f"{ip}:{port}")
     print("Arquivos encontrados na rede:")
     print("\t{:<4} {:<20} | {:<10} | {}".format('', 'Nome', 'Tamanho', 'Peer'))
     print("\t[ 0] {:<20} | {:<10} | {}".format('<Cancelar>', '', ''))
-    for idx, (nome, tamanho, peer_addr) in enumerate(arquivos, start=1):
-        print(f"\t[ {idx}] {nome:<20} | {tamanho:<10} | {peer_addr}")
+    
+    keys = list(arquivos.keys())
+    for idx, ((nome, tamanho), peers) in enumerate(arquivos.items(), start=1):
+        print(f"\t[ {idx}] {nome:<20} | {tamanho:<10} | {', '.join(peers)}")
     
     print("\nDigite o numero do arquivo para fazer o download:")
     choice = int(input(">"))
@@ -61,7 +63,7 @@ def search_files():
     if choice < 1 or choice > len(arquivos):
         print("Escolha inválida.")
         return
-    nome, tamanho, peer_addr = arquivos[choice - 1]
+    nome, tamanho, peer_addr = arquivos[keys[choice - 1]]
     print(f"arquivo escolhido {nome}")
 
     peer_ip, peer_port = peer_addr.split(":")
