@@ -20,6 +20,7 @@ class Connection:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         #socket.AF_INET define o uso de protocolos IPv4
         #socket.SOCK_STREAM define o uso de TCP
+        self.chunk_size = 256
         self.clock = 0
         self.lock = threading.Lock() # Cria um lock para controlar o acesso ao clock
         self.ls_results = []  # Guarda resultados LS_LIST
