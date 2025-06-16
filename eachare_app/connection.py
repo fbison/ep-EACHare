@@ -24,6 +24,9 @@ class Connection:
         self.clock = 0
         self.lock = threading.Lock() # Cria um lock para controlar o acesso ao clock
         self.ls_results = []  # Guarda resultados LS_LIST
+        self.file_results = []  # Guarda resultados FILE
+        self.file_results_lock = threading.Lock()  # Lock para controlar o acesso à lista do FILE
+        self.print_lock = threading.Lock()  # Lock para prints thread-safe
 
     def start_server(self):
         self.socket.bind((self.address, self.port))  
@@ -84,6 +87,10 @@ class Connection:
         with self.lock:
             self.clock = max(self.clock, peer_clock) + 1
             print(f"\t=> Atualizando relogio para {self.clock}")
+    
+    def get_chunk_size(self) -> int:
+        """Retorna o tamanho do chunk usado nos downloads."""
+        return self.chunk_size
 
     def change_chunk_size(self, new_size: int):
         """Altera o tamanho do chunk usado nos downloads."""
@@ -91,6 +98,10 @@ class Connection:
             raise ValueError("O tamanho do chunk deve ser maior que zero.")
         self.chunk_size = new_size
         print("\tTamanho do chunk alterado:", self.chunk_size)
+
+    def get_file_results(self):
+        """Retorna os resultados de arquivos recebidos."""
+        return self.file_results
 
     def get_peers_response_args(self, peer_ip, peer_port):
         # Verifica se o peer já existe, se não existir adiciona
@@ -147,29 +158,21 @@ class Connection:
         if message_list[2] == "DL":
             share_dir = get_shared_dir()
             file_name = message_list[3]
+            chunk_size = int(message_list[4])
+            chunk_index = int(message_list[5])
             file_path = os.path.join(share_dir, file_name)
             try:
                 with open(file_path, "rb") as f:
-                    file_content = f.read()
-                encoded_content = base64.b64encode(file_content).decode("utf-8")
+                    f.seek(chunk_index * chunk_size)
+                    chunk_data = f.read(chunk_size)
+                encoded_content = base64.b64encode(chunk_data).decode("utf-8")
             except Exception as e:
                 encoded_content = ""
-            self.send_answer(peer, client_socket, "FILE", file_name, 0, 0, encoded_content)
+            self.send_answer(peer, client_socket, "FILE", file_name, len(chunk_data), chunk_index, encoded_content)
             return
         if message_list[2] == "FILE":
-            share_dir = get_shared_dir()
-            file_name = message_list[3]
-            encoded_content = message_list[6] if len(message_list) > 6 else ""
-            file_path = os.path.join(share_dir, file_name)
-            try:
-                file_data = base64.b64decode(encoded_content)
-                with open(file_path, "wb") as f:
-                    f.write(file_data)
-                print(f"Download do arquivo {file_name} finalizado.")
-            except Exception as e:
-                print(f"Erro ao salvar arquivo {file_name}: {e}")
-            # Retorna ao menu inicial (nada a fazer, pois o menu já é um loop)
-            return
+            with self.file_results_lock:
+                self.file_results.append((message_list[5], message_list[6])) # Armazena o índice do chunk e o arquivo encoded
         # Trata Requisições
         if message_list[2] == "LS":
             share_dir = get_shared_dir()
@@ -205,7 +208,8 @@ class Connection:
             peer_socket = socket.create_connection((peer.ip, int(peer.port)), timeout=TIMEOUT_CONNECTION)
             self.increment_clock()
             message = self.format_message(type, *args)
-            print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
+            with self.print_lock:
+                print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
             peer_socket.sendall(message.encode())
             peer.set_online()
 
@@ -214,7 +218,8 @@ class Connection:
                 self.handle_message(response, peer_socket)
 
         except Exception as e:
-            print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
+            with self.print_lock:
+                print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
             peer.set_offline()
 
         finally:
@@ -226,14 +231,15 @@ class Connection:
         try:
             self.increment_clock()
             message = self.format_message(type, *args)
-            print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
+            with self.print_lock:
+                print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
             client_socket.sendall(message.encode())
         except Exception as e:
-            print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
+            with self.print_lock:
+                print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
             peer.set_offline()
         finally:
             client_socket.close()
-            
             # Fecha o socket após enviar a resposta, pois não é mais necessária a conexão
 
     def stop(self):

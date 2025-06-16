@@ -3,6 +3,8 @@ from eachare_app.connection import Connection
 from eachare_app.peer_manager import PeerManager
 from eachare_app.peer import Peer
 import os
+import threading
+import base64
 from eachare_app.config import set_shared_dir, get_shared_dir
 # Exit constant
 EXIT_COMMAND = 9
@@ -47,6 +49,7 @@ def search_files():
                 nome, tamanho = file_info.split(":", 1)
             else:
                 nome, tamanho = file_info, '0'
+            tamanho = int(tamanho)
             arquivos.setdefault((nome, tamanho), []).append(f"{ip}:{port}")
     print("Arquivos encontrados na rede:")
     print("\t{:<4} {:<20} | {:<10} | {}".format('', 'Nome', 'Tamanho', 'Peer'))
@@ -63,13 +66,54 @@ def search_files():
     if choice < 1 or choice > len(arquivos):
         print("Escolha inválida.")
         return
-    nome, tamanho, peer_addr = arquivos[keys[choice - 1]]
+    nome, tamanho = keys[choice - 1]
+    peers = arquivos[(nome, tamanho)]
     print(f"arquivo escolhido {nome}")
 
-    peer_ip, peer_port = peer_addr.split(":")
-    peer_port = int(peer_port)
-    peer = peer_manager.get_peer(peer_ip, peer_port)
-    connection.send_message(peer, "DL", nome, 0, 0, waitForAnswer=True)
+
+    chunk_size = connection.get_chunk_size()
+    chunks = (tamanho + chunk_size - 1) // chunk_size # Calcula o número de chunks
+    next_chunk = 0
+    index_lock = threading.Lock()  # Lock para controlar o acesso ao índice do chunk
+
+    file_results = connection.get_file_results()
+    file_results.clear()  # Limpa resultados de downloads anteriores
+
+    def worker(peer_addr):
+        nonlocal next_chunk
+        peer_ip, peer_port = peer_addr.split(":")
+        peer_port = int(peer_port)
+        peer = peer_manager.get_peer(peer_ip, peer_port)
+        while next_chunk < chunks:
+            with index_lock:
+                current_chunk = next_chunk
+                next_chunk += 1
+            connection.send_message(peer, "DL", nome, chunk_size, current_chunk, waitForAnswer=True)
+
+    threads = [] # Lista para armazenar threads e finalizá-las depois
+    for peer_addr in peers:
+        t = threading.Thread(target=worker, args=(peer_addr,))
+        t.start()
+        threads.append(t)
+
+    for thread in threads:
+        thread.join()
+    
+    file_results = connection.get_file_results()
+
+    file_results.sort() # Ordena os resultados por chunk
+
+
+    share_dir = get_shared_dir()
+
+    file_path = os.path.join(share_dir, nome)
+    try:
+        with open(file_path, "wb") as f:
+            for _, content in file_results:
+                f.write(base64.b64decode(content))
+    except Exception as e:
+        print(f"Erro ao salvar arquivo {nome}: {e}")
+    print(f"\nDownload do arquivo {nome} finalizado.")
 
 def show_statistics():
     print("")
