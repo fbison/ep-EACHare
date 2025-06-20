@@ -1,21 +1,21 @@
 import threading
 
 class Peer:
-    def __init__(self, ip, port, online=False, mysterious_number=0):
+    def __init__(self, ip, port, online=False, clock=0):
         self.ip = ip
         self.port = port
         self.online = online
-        self.mysterious_number = mysterious_number
+        self.clock = clock
         self.lock = threading.Lock()
     
     def describe_as_message(self):
         with self.lock:
             status = "ONLINE" if self.online else "OFFLINE"
-            return f"{self.ip}:{self.port}:{status}:{self.mysterious_number}"
+            return f"{self.ip}:{self.port}:{status}:{self.clock}"
 
-    def set_mysterious_number(self, number: int):
+    def set_clock(self, clock: int):
         with self.lock:
-            self.mysterious_number = number
+            self.clock = clock
 
     def set_online(self):
         with self.lock:

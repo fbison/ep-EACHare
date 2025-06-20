@@ -3,11 +3,11 @@ from eachare_app.connection import Connection
 from eachare_app.peer_manager import PeerManager
 from eachare_app.peer import Peer
 import os
+from eachare_app.config import set_shared_dir, get_shared_dir
 # Exit constant
 EXIT_COMMAND = 9
 
 peer_manager = PeerManager()
-_shared_dir= ""
 
 def hello(peer: Peer):
     connection.send_message(peer, "HELLO")
@@ -15,15 +15,16 @@ def hello(peer: Peer):
 def get_peers():
     peers = peer_manager.list_peers()
     for peer in peers:
-        connection.send_message(peer, "GET_PEERS")
+        connection.send_message(peer, "GET_PEERS", waitForAnswer=True)
 
 def list_local_files():
-    if not _shared_dir:
+    shared_dir = get_shared_dir()
+    if not shared_dir:
         print("Erro: O diretório compartilhado não foi configurado.")
         return
 
     try:
-        files = os.listdir(_shared_dir)
+        files = os.listdir(shared_dir)
         if files:
             for file in files:
                 print(f"\t{file}")
@@ -31,8 +32,42 @@ def list_local_files():
         print(f"Erro ao listar arquivos: {e}")
 
 def search_files():
-    print("")
-    #TODO: Implementation
+    peers = peer_manager.get_online_peers()
+    if not peers:
+        print("Nenhum peer online para buscar arquivos.")
+        return
+    connection.ls_results = []
+    for peer in peers:
+        connection.send_message(peer, "LS", waitForAnswer=True)
+    # Exibe menu de arquivos encontrados
+    arquivos = []
+    for ip, port, files in connection.ls_results:
+        for file_info in files:
+            if ':' in file_info:
+                nome, tamanho = file_info.split(":", 1)
+            else:
+                nome, tamanho = file_info, '0'
+            arquivos.append((nome, tamanho, f"{ip}:{port}"))
+    print("Arquivos encontrados na rede:")
+    print("\t{:<4} {:<20} | {:<10} | {}".format('', 'Nome', 'Tamanho', 'Peer'))
+    print("\t[ 0] {:<20} | {:<10} | {}".format('<Cancelar>', '', ''))
+    for idx, (nome, tamanho, peer_addr) in enumerate(arquivos, start=1):
+        print(f"\t[ {idx}] {nome:<20} | {tamanho:<10} | {peer_addr}")
+    
+    print("\nDigite o numero do arquivo para fazer o download:")
+    choice = int(input(">"))
+    if choice == 0:
+        return
+    if choice < 1 or choice > len(arquivos):
+        print("Escolha inválida.")
+        return
+    nome, tamanho, peer_addr = arquivos[choice - 1]
+    print(f"arquivo escolhido {nome}")
+
+    peer_ip, peer_port = peer_addr.split(":")
+    peer_port = int(peer_port)
+    peer = peer_manager.get_peer(peer_ip, peer_port)
+    connection.send_message(peer, "DL", nome, 0, 0, waitForAnswer=True)
 
 def show_statistics():
     print("")
@@ -120,8 +155,7 @@ def verify_shared_dir(shared_dir: str) -> None:
         raise RuntimeError(f"Erro: O caminho '{shared_dir}' não é um diretório.")
     if not os.access(shared_dir, os.R_OK):
         raise RuntimeError(f"Erro: O diretório compartilhado '{shared_dir}' não é acessível para leitura.")
-    global _shared_dir 
-    _shared_dir = shared_dir
+    set_shared_dir(shared_dir)
 
 def main():
     if len(sys.argv) != 4:
