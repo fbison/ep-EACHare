@@ -3,6 +3,8 @@ from eachare_app.connection import Connection
 from eachare_app.peer_manager import PeerManager
 from eachare_app.peer import Peer
 import os
+import threading
+import base64
 from eachare_app.config import set_shared_dir, get_shared_dir
 # Exit constant
 EXIT_COMMAND = 9
@@ -36,23 +38,26 @@ def search_files():
     if not peers:
         print("Nenhum peer online para buscar arquivos.")
         return
-    connection.ls_results = []
+    connection.ls_results = [] # Limpa resultados de buscas anteriores
     for peer in peers:
         connection.send_message(peer, "LS", waitForAnswer=True)
     # Exibe menu de arquivos encontrados
-    arquivos = []
+    arquivos = {}
     for ip, port, files in connection.ls_results:
         for file_info in files:
             if ':' in file_info:
                 nome, tamanho = file_info.split(":", 1)
             else:
                 nome, tamanho = file_info, '0'
-            arquivos.append((nome, tamanho, f"{ip}:{port}"))
+            tamanho = int(tamanho)
+            arquivos.setdefault((nome, tamanho), []).append(f"{ip}:{port}")
     print("Arquivos encontrados na rede:")
     print("\t{:<4} {:<20} | {:<10} | {}".format('', 'Nome', 'Tamanho', 'Peer'))
     print("\t[ 0] {:<20} | {:<10} | {}".format('<Cancelar>', '', ''))
-    for idx, (nome, tamanho, peer_addr) in enumerate(arquivos, start=1):
-        print(f"\t[ {idx}] {nome:<20} | {tamanho:<10} | {peer_addr}")
+    
+    keys = list(arquivos.keys())
+    for idx, ((nome, tamanho), peers) in enumerate(arquivos.items(), start=1):
+        print(f"\t[ {idx}] {nome:<20} | {tamanho:<10} | {', '.join(peers)}")
     
     print("\nDigite o numero do arquivo para fazer o download:")
     choice = int(input(">"))
@@ -61,21 +66,66 @@ def search_files():
     if choice < 1 or choice > len(arquivos):
         print("Escolha inválida.")
         return
-    nome, tamanho, peer_addr = arquivos[choice - 1]
+    nome, tamanho = keys[choice - 1]
+    peers = arquivos[(nome, tamanho)]
     print(f"arquivo escolhido {nome}")
 
-    peer_ip, peer_port = peer_addr.split(":")
-    peer_port = int(peer_port)
-    peer = peer_manager.get_peer(peer_ip, peer_port)
-    connection.send_message(peer, "DL", nome, 0, 0, waitForAnswer=True)
+
+    chunk_size = connection.get_chunk_size()
+    chunks = (tamanho + chunk_size - 1) // chunk_size # Calcula o número de chunks
+    next_chunk = 0
+    index_lock = threading.Lock()  # Lock para controlar o acesso ao índice do chunk
+
+    file_results = connection.get_file_results()
+    file_results.clear()  # Limpa resultados de downloads anteriores
+
+    def worker(peer_addr):
+        nonlocal next_chunk
+        peer_ip, peer_port = peer_addr.split(":")
+        peer_port = int(peer_port)
+        peer = peer_manager.get_peer(peer_ip, peer_port)
+        while next_chunk < chunks:
+            with index_lock:
+                current_chunk = next_chunk
+                next_chunk += 1
+            connection.send_message(peer, "DL", nome, chunk_size, current_chunk, waitForAnswer=True)
+
+    threads = [] # Lista para armazenar threads e finalizá-las depois
+    for peer_addr in peers:
+        t = threading.Thread(target=worker, args=(peer_addr,))
+        t.start()
+        threads.append(t)
+
+    for thread in threads:
+        thread.join()
+    
+    file_results = connection.get_file_results()
+
+    file_results.sort() # Ordena os resultados por chunk
+
+
+    share_dir = get_shared_dir()
+
+    file_path = os.path.join(share_dir, nome)
+    try:
+        with open(file_path, "wb") as f:
+            for _, content in file_results:
+                f.write(base64.b64decode(content))
+    except Exception as e:
+        print(f"Erro ao salvar arquivo {nome}: {e}")
+    print(f"\nDownload do arquivo {nome} finalizado.")
 
 def show_statistics():
     print("")
     #TODO: Implementation
 
 def change_chunk_size():
-    print("")
-    #TODO: Implementation
+    print("Digite novo tamanho do chunk:")
+    new_size = int(input(">"))
+    if new_size <= 0:
+        print("Tamanho inválido. Deve ser um número positivo.")
+        return
+    connection.change_chunk_size(new_size)
 
 def exit():
     for peer in peer_manager.get_online_peers():
