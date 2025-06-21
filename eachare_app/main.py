@@ -67,7 +67,7 @@ def search_files():
         print("Escolha inválida.")
         return
     nome, tamanho = keys[choice - 1]
-    peers = arquivos[(nome, tamanho)]
+    peers_containing_file = arquivos[(nome, tamanho)]
     print(f"arquivo escolhido {nome}")
 
 
@@ -76,23 +76,22 @@ def search_files():
     next_chunk = 0
     index_lock = threading.Lock()  # Lock para controlar o acesso ao índice do chunk
 
-    file_results = connection.get_file_results()
     file_results.clear()  # Limpa resultados de downloads anteriores
 
-    def worker(peer_addr):
+    def download_chunks_worker(peer_addr):
         nonlocal next_chunk
         peer_ip, peer_port = peer_addr.split(":")
         peer_port = int(peer_port)
         peer = peer_manager.get_peer(peer_ip, peer_port)
         while next_chunk < chunks:
-            with index_lock:
+            with index_lock: # Verifica o chunck que será buscado, evitando que duas threads busquem o mesmo chunk
                 current_chunk = next_chunk
                 next_chunk += 1
             connection.send_message(peer, "DL", nome, chunk_size, current_chunk, waitForAnswer=True)
 
     threads = [] # Lista para armazenar threads e finalizá-las depois
-    for peer_addr in peers:
-        t = threading.Thread(target=worker, args=(peer_addr,))
+    for peer_addr in peers_containing_file:
+        t = threading.Thread(target=download_chunks_worker, args=(peer_addr,))
         t.start()
         threads.append(t)
 
