@@ -119,6 +119,16 @@ class Connection:
     }
     response_type = {"PEER_LIST", "LS_LIST", "FILE"}
 
+    def abbreviate_message(self, message: str) -> str:
+        """Encurta o conteúdo da mensagem FILE apenas para exibição."""
+        parts = str(message[:]).strip().split(" ")
+        if len(parts) >= 7 and parts[2] == "FILE":
+            # Limita o conteúdo do arquivo (última parte) a 30 caracteres
+            shortened_content = parts[6][:30] + "..." if len(parts[6]) > 30 else parts[6]
+            parts[6] = shortened_content
+            return " ".join(parts)
+        return message
+
     def handle_message(self, message:str, client_socket:socket.socket):
         message = message.strip()
         message_list = message.split(" ")
@@ -142,9 +152,9 @@ class Connection:
 
         # Impressão de acordo com o tipo de mensagem
         if message_list[2] in self.response_type:
-            print(f"\tResposta recebida: \"{message}\"")
+            print(f"\tResposta recebida: \"{self.abbreviate_message(message)}\"")
         else:
-            print(f"\tMensagem recebida: \"{message}\"")
+            print(f"\tMensagem recebida: \"{self.abbreviate_message(message)}\"")
         # Atualiza o relógio lógico com o valor do peer
         self.update_clock(clock)
 
@@ -209,7 +219,7 @@ class Connection:
             self.increment_clock()
             message = self.format_message(type, *args)
             with self.print_lock:
-                print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
+                print(f"\tEncaminhando mensagem \"{self.abbreviate_message(message.strip())}\" para {peer.ip}:{peer.port}")
             peer_socket.sendall(message.encode())
             peer.set_online()
 
@@ -232,7 +242,7 @@ class Connection:
             self.increment_clock()
             message = self.format_message(type, *args)
             with self.print_lock:
-                print(f"\tEncaminhando mensagem \"{message.strip()}\" para {peer.ip}:{peer.port}")
+                print(f"\tEncaminhando mensagem \"{self.abbreviate_message(message.strip())}\" para {peer.ip}:{peer.port}")
             client_socket.sendall(message.encode())
         except Exception as e:
             with self.print_lock:

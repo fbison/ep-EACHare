@@ -5,11 +5,14 @@ from eachare_app.peer import Peer
 import os
 import threading
 import base64
+import math
+import time
 from eachare_app.config import set_shared_dir, get_shared_dir
 # Exit constant
 EXIT_COMMAND = 9
 
 peer_manager = PeerManager()
+download_statistics = {}
 
 def hello(peer: Peer):
     connection.send_message(peer, "HELLO")
@@ -76,6 +79,7 @@ def search_files():
     next_chunk = 0
     index_lock = threading.Lock()  # Lock para controlar o acesso ao índice do chunk
 
+    file_results = connection.get_file_results()
     file_results.clear()  # Limpa resultados de downloads anteriores
 
     def download_chunks_worker(peer_addr):
@@ -89,6 +93,7 @@ def search_files():
                 next_chunk += 1
             connection.send_message(peer, "DL", nome, chunk_size, current_chunk, waitForAnswer=True)
 
+    download_begin_time = time.time()  # Marca o tempo de início do download
     threads = [] # Lista para armazenar threads e finalizá-las depois
     for peer_addr in peers_containing_file:
         t = threading.Thread(target=download_chunks_worker, args=(peer_addr,))
@@ -102,6 +107,9 @@ def search_files():
 
     file_results.sort() # Ordena os resultados por chunk
 
+    download_end_time = time.time()  # Marca o tempo de fim do download
+    download_time = download_end_time - download_begin_time
+    add_download_statistics(download_time, tamanho, chunk_size, len(peers_containing_file))
 
     share_dir = get_shared_dir()
 
@@ -114,9 +122,56 @@ def search_files():
         print(f"Erro ao salvar arquivo {nome}: {e}")
     print(f"\nDownload do arquivo {nome} finalizado.")
 
+def add_download_statistics(download_time: float, file_size: int, chunk_size: int, number_of_peers: int):
+    global download_statistics
+    
+    key = (chunk_size, number_of_peers, file_size)
+
+    if key not in download_statistics:
+        # Primeira entrada: inicializa com os valores básicos
+        download_statistics[key] = {
+            "count": 1,
+            "mean": download_time,
+            "M2": 0.0, # Variance accumulator usada para calcular o desvio padrão, sem guardar todos os tempos
+            "stddev": 0.0
+        }
+    else:
+        stats = download_statistics[key]
+        n = stats["count"]
+        mean = stats["mean"]
+        M2 = stats["M2"]
+
+        # Welford update
+        n += 1
+        delta = download_time - mean
+        mean += delta / n
+        delta2 = download_time - mean
+        M2 += delta * delta2
+        stddev = math.sqrt(M2 / (n - 1))
+
+        # Atualiza valores
+        download_statistics[key] = {
+            "count": n,
+            "mean": mean,
+            "M2": M2,
+            "stddev": stddev
+        }
+
 def show_statistics():
-    print("")
-    #TODO: Implementation
+    print("{:<11} | {:<8} | {:<13} | {:<3} | {:<10} | {:<10}".format(
+        "Tam. chunk", "N peers", "Tam. arquivo", "N", "Tempo [s]", "Desvio"
+    ))
+    print("-" * 70)
+
+    for (chunk_size, n_peers, file_size), stats in download_statistics.items():
+        print("{:<11} | {:<8} | {:<13} | {:<3} | {:<10.5f} | {:<10.5f}".format(
+            chunk_size,
+            n_peers,
+            file_size,
+            stats["count"],
+            stats["mean"],
+            stats["stddev"]
+        ))
 
 def change_chunk_size():
     print("Digite novo tamanho do chunk:")
@@ -164,9 +219,6 @@ def read_peers(peers_file: str, peer_manager: PeerManager) -> None:
         raise RuntimeError(f"Erro: O arquivo {peers_file} não foi encontrado.")
     except ValueError:
         raise RuntimeError("Erro: O arquivo de peers contém uma linha inválida.")
-
-#TODO: Verificar se o menu de peers deve ficar iterando até a pessoa sair 
-# ou após mandar um HELLO ele retorna para o menu anterior
 
 def menu_peers(peers: list[Peer], function: callable) -> None:
     while True:
