@@ -88,7 +88,7 @@ def search_files():
         peer_port = int(peer_port)
         peer = peer_manager.get_peer(peer_ip, peer_port)
         while next_chunk < chunks:
-            with index_lock: # Verifica o chunck que será buscado, evitando que duas threads busquem o mesmo chunk
+            with index_lock: # Verifica o chunk que será buscado, evitando que duas threads busquem o mesmo chunk
                 current_chunk = next_chunk
                 next_chunk += 1
             connection.send_message(peer, "DL", nome, chunk_size, current_chunk, waitForAnswer=True)
