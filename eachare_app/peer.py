@@ -1,4 +1,5 @@
 import threading
+from eachare_app.utils import print_with_lock
 
 class Peer:
     def __init__(self, ip, port, online=False, clock=0):
@@ -20,9 +21,9 @@ class Peer:
     def set_online(self):
         with self.lock:
             self.online = True
-            print(f"\tAtualizando peer {self.ip}:{self.port} status ONLINE")
+            print_with_lock(f"\tAtualizando peer {self.ip}:{self.port} status ONLINE")
     
     def set_offline(self):
         with self.lock:
             self.online = False
-            print(f"\tAtualizando peer {self.ip}:{self.port} status OFFLINE")
+            print_with_lock(f"\tAtualizando peer {self.ip}:{self.port} status OFFLINE")

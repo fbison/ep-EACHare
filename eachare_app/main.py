@@ -11,6 +11,11 @@ from eachare_app.config import set_shared_dir, get_shared_dir
 # Exit constant
 EXIT_COMMAND = 9
 
+print_lock = threading.Lock()
+def print_with_lock(*args, **kwargs):
+    with print_lock:
+        print(*args, **kwargs)
+
 peer_manager = PeerManager()
 download_statistics = {}
 
@@ -25,21 +30,21 @@ def get_peers():
 def list_local_files():
     shared_dir = get_shared_dir()
     if not shared_dir:
-        print("Erro: O diretório compartilhado não foi configurado.")
+        print_with_lock("Erro: O diretório compartilhado não foi configurado.")
         return
 
     try:
         files = os.listdir(shared_dir)
         if files:
             for file in files:
-                print(f"\t{file}")
+                print_with_lock(f"\t{file}")
     except Exception as e:
-        print(f"Erro ao listar arquivos: {e}")
+        print_with_lock(f"Erro ao listar arquivos: {e}")
 
 def search_files():
     peers = peer_manager.get_online_peers()
     if not peers:
-        print("Nenhum peer online para buscar arquivos.")
+        print_with_lock("Nenhum peer online para buscar arquivos.")
         return
     connection.ls_results = [] # Limpa resultados de buscas anteriores
     for peer in peers:
@@ -54,24 +59,22 @@ def search_files():
                 nome, tamanho = file_info, '0'
             tamanho = int(tamanho)
             arquivos.setdefault((nome, tamanho), []).append(f"{ip}:{port}")
-    print("Arquivos encontrados na rede:")
-    print("\t{:<4} {:<20} | {:<10} | {}".format('', 'Nome', 'Tamanho', 'Peer'))
-    print("\t[ 0] {:<20} | {:<10} | {}".format('<Cancelar>', '', ''))
-    
+    print_with_lock("Arquivos encontrados na rede:")
+    print_with_lock("\t{:<4} {:<20} | {:<10} | {}".format('', 'Nome', 'Tamanho', 'Peer'))
+    print_with_lock("\t[ 0] {:<20} | {:<10} | {}".format('<Cancelar>', '', ''))
     keys = list(arquivos.keys())
     for idx, ((nome, tamanho), peers) in enumerate(arquivos.items(), start=1):
-        print(f"\t[ {idx}] {nome:<20} | {tamanho:<10} | {', '.join(peers)}")
-    
-    print("\nDigite o numero do arquivo para fazer o download:")
+        print_with_lock(f"\t[ {idx}] {nome:<20} | {tamanho:<10} | {', '.join(peers)}")
+    print_with_lock("\nDigite o numero do arquivo para fazer o download:")
     choice = int(input(">"))
     if choice == 0:
         return
     if choice < 1 or choice > len(arquivos):
-        print("Escolha inválida.")
+        print_with_lock("Escolha inválida.")
         return
     nome, tamanho = keys[choice - 1]
     peers_containing_file = arquivos[(nome, tamanho)]
-    print(f"arquivo escolhido {nome}")
+    print_with_lock(f"arquivo escolhido {nome}")
 
 
     chunk_size = connection.get_chunk_size()
@@ -119,8 +122,8 @@ def search_files():
             for _, content in file_results:
                 f.write(base64.b64decode(content))
     except Exception as e:
-        print(f"Erro ao salvar arquivo {nome}: {e}")
-    print(f"\nDownload do arquivo {nome} finalizado.")
+        print_with_lock(f"Erro ao salvar arquivo {nome}: {e}")
+    print_with_lock(f"\nDownload do arquivo {nome} finalizado.")
 
 def add_download_statistics(download_time: float, file_size: int, chunk_size: int, number_of_peers: int):
     global download_statistics
@@ -158,13 +161,13 @@ def add_download_statistics(download_time: float, file_size: int, chunk_size: in
         }
 
 def show_statistics():
-    print("{:<11} | {:<8} | {:<13} | {:<3} | {:<10} | {:<10}".format(
+    print_with_lock("{:<11} | {:<8} | {:<13} | {:<3} | {:<10} | {:<10}".format(
         "Tam. chunk", "N peers", "Tam. arquivo", "N", "Tempo [s]", "Desvio"
     ))
-    print("-" * 70)
+    print_with_lock("-" * 70)
 
     for (chunk_size, n_peers, file_size), stats in download_statistics.items():
-        print("{:<11} | {:<8} | {:<13} | {:<3} | {:<10.5f} | {:<10.5f}".format(
+        print_with_lock("{:<11} | {:<8} | {:<13} | {:<3} | {:<10.5f} | {:<10.5f}".format(
             chunk_size,
             n_peers,
             file_size,
@@ -174,10 +177,10 @@ def show_statistics():
         ))
 
 def change_chunk_size():
-    print("Digite novo tamanho do chunk:")
+    print_with_lock("Digite novo tamanho do chunk:")
     new_size = int(input(">"))
     if new_size <= 0:
-        print("Tamanho inválido. Deve ser um número positivo.")
+        print_with_lock("Tamanho inválido. Deve ser um número positivo.")
         return
     connection.change_chunk_size(new_size)
 
@@ -188,9 +191,9 @@ def exit():
     sys.exit()
 
 def show_commands():
-    print("Escolha um comando:")
+    print_with_lock("Escolha um comando:")
     for key, value in commands_functions.items():
-        print(f"\t[{key}] {value['description']}")
+        print_with_lock(f"\t[{key}] {value['description']}")
 
 def execute_command(command_number):
     if command_number not in commands_functions:
@@ -207,7 +210,7 @@ def menu():
                 break
             execute_command(command_number)
         except ValueError:
-            print("Por favor, insira um número válido.")
+            print_with_lock("Por favor, insira um número válido.")
 
 def read_peers(peers_file: str, peer_manager: PeerManager) -> None:
     try:
@@ -222,15 +225,15 @@ def read_peers(peers_file: str, peer_manager: PeerManager) -> None:
 
 def menu_peers(peers: list[Peer], function: callable) -> None:
     while True:
-        print("Lista de peers:")
-        print("\t[0] voltar para o menu anterior")
+        print_with_lock("Lista de peers:")
+        print_with_lock("\t[0] voltar para o menu anterior")
         for index, peer in enumerate(peers, start=1):
-            print(f"\t[{index}] {peer.ip}:{peer.port} {'ONLINE' if peer.online else 'OFFLINE'}")
+            print_with_lock(f"\t[{index}] {peer.ip}:{peer.port} {'ONLINE' if peer.online else 'OFFLINE'}")
         command_number = int(input(">"))
         if command_number == 0:
             break
         if command_number > len(peers):
-            print("Por favor, insira um número válido.")
+            print_with_lock("Por favor, insira um número válido.")
             continue
         function(peers[command_number-1])
 
@@ -260,7 +263,7 @@ def verify_shared_dir(shared_dir: str) -> None:
 
 def main():
     if len(sys.argv) != 4:
-        print("Uso: ./eachare <endereço:porta> <vizinhos.txt> <diretorio_compartilhado>")
+        print_with_lock("Uso: ./eachare <endereço:porta> <vizinhos.txt> <diretorio_compartilhado>")
         sys.exit(1)
 
     address, port = sys.argv[1].split(':')
@@ -275,7 +278,7 @@ def main():
         connection.start_server() # Após ler os peers, inicia o servidor, conforme a especificação
         menu()
     except RuntimeError as error:
-        print(error)
+        print_with_lock(error)
 
 if __name__ == '__main__':
     main()

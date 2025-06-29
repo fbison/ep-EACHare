@@ -6,6 +6,7 @@ import base64  # Corrigido: import base64 no topo
 from eachare_app.peer import Peer
 from eachare_app.peer_manager import PeerManager
 from eachare_app.config import get_shared_dir
+from eachare_app.utils import print_with_lock
 
 MAX_CONNECTIONS = int(5)
 TIMEOUT_CONNECTION = int(5) # Diminui o tempo de espera para uma conexão offline
@@ -26,7 +27,6 @@ class Connection:
         self.ls_results = []  # Guarda resultados LS_LIST
         self.file_results = []  # Guarda resultados FILE
         self.file_results_lock = threading.Lock()  # Lock para controlar o acesso à lista do FILE
-        self.print_lock = threading.Lock()  # Lock para prints thread-safe
 
     def start_server(self):
         self.socket.bind((self.address, self.port))  
@@ -49,7 +49,7 @@ class Connection:
                 thread.start()
             except Exception as e:
                 if self.running:  # Apenas imprime o erro se o servidor ainda estiver rodando
-                    print(f"Erro ao aceitar conexão: {e}")
+                    print_with_lock(f"Erro ao aceitar conexão: {e}")
 
     def handle_client(self, client_socket):
         """Lida com mensagens recebidas de um peer."""
@@ -68,7 +68,7 @@ class Connection:
                     #Será fechada por quem recebeu a conexão
                     return 
         except Exception as e:
-            print(f"Erro ao lidar com cliente: {e} (type: {type(e)})")
+            print_with_lock(f"Erro ao lidar com cliente: {e} (type: {type(e)})")
             client_socket.close()
        
     def format_message(self, message_type: str, *args) -> str:
@@ -79,14 +79,14 @@ class Connection:
         """Incrementa o relógio lógico."""
         with self.lock:
             self.clock += 1
-            print(f"\t=> Atualizando relogio para {self.clock}")
+            print_with_lock(f"\t=> Atualizando relogio para {self.clock}")
 
     
     def update_clock(self, peer_clock:int):
         """Atualiza o relógio lógico com o valor do peer."""
         with self.lock:
             self.clock = max(self.clock, peer_clock) + 1
-            print(f"\t=> Atualizando relogio para {self.clock}")
+            print_with_lock(f"\t=> Atualizando relogio para {self.clock}")
     
     def get_chunk_size(self) -> int:
         """Retorna o tamanho do chunk usado nos downloads."""
@@ -97,7 +97,7 @@ class Connection:
         if new_size <= 0:
             raise ValueError("O tamanho do chunk deve ser maior que zero.")
         self.chunk_size = new_size
-        print("\tTamanho do chunk alterado:", self.chunk_size)
+        print_with_lock("\tTamanho do chunk alterado:", self.chunk_size)
 
     def get_file_results(self):
         """Retorna os resultados de arquivos recebidos."""
@@ -137,7 +137,7 @@ class Connection:
         clock = int(message_list[1])
 
         if message_list[2] not in self.message_type:
-            print(f"\tMensagem desconhecida: \"{message}\"")
+            print_with_lock(f"\tMensagem desconhecida: \"{message}\"")
             return
         
         # Atualiza o clock do peer que enviou a mensagem
@@ -152,9 +152,9 @@ class Connection:
 
         # Impressão de acordo com o tipo de mensagem
         if message_list[2] in self.response_type:
-            print(f"\tResposta recebida: \"{self.abbreviate_message(message)}\"")
+            print_with_lock(f"\tResposta recebida: \"{self.abbreviate_message(message)}\"")
         else:
-            print(f"\tMensagem recebida: \"{self.abbreviate_message(message)}\"")
+            print_with_lock(f"\tMensagem recebida: \"{self.abbreviate_message(message)}\"")
         # Atualiza o relógio lógico com o valor do peer
         self.update_clock(clock)
 
@@ -218,8 +218,7 @@ class Connection:
             peer_socket = socket.create_connection((peer.ip, int(peer.port)), timeout=TIMEOUT_CONNECTION)
             self.increment_clock()
             message = self.format_message(type, *args)
-            with self.print_lock:
-                print(f"\tEncaminhando mensagem \"{self.abbreviate_message(message.strip())}\" para {peer.ip}:{peer.port}")
+            print_with_lock(f"\tEncaminhando mensagem \"{self.abbreviate_message(message.strip())}\" para {peer.ip}:{peer.port}")
             peer_socket.sendall(message.encode())
             peer.set_online()
 
@@ -228,8 +227,7 @@ class Connection:
                 self.handle_message(response, peer_socket)
 
         except Exception as e:
-            with self.print_lock:
-                print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
+            print_with_lock(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
             peer.set_offline()
 
         finally:
@@ -241,12 +239,10 @@ class Connection:
         try:
             self.increment_clock()
             message = self.format_message(type, *args)
-            with self.print_lock:
-                print(f"\tEncaminhando mensagem \"{self.abbreviate_message(message.strip())}\" para {peer.ip}:{peer.port}")
+            print_with_lock(f"\tEncaminhando mensagem \"{self.abbreviate_message(message.strip())}\" para {peer.ip}:{peer.port}")
             client_socket.sendall(message.encode())
         except Exception as e:
-            with self.print_lock:
-                print(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
+            print_with_lock(f"Erro ao conectar com peer {peer.ip}:{peer.port}: {e}")
             peer.set_offline()
         finally:
             client_socket.close()
@@ -255,4 +251,4 @@ class Connection:
     def stop(self):
         self.running = False
         self.socket.close()
-        print("Saindo...")
+        print_with_lock("Saindo...")
