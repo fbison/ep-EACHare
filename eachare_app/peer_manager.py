@@ -1,4 +1,5 @@
 from eachare_app.peer import Peer
+from eachare_app.utils import print_with_lock
 from threading import Lock
 
 class PeerManager:
@@ -13,7 +14,7 @@ class PeerManager:
             if (ip, port) in self.peers:
                 return
             self.peers[(ip, port)] = Peer(ip, port)
-        print(f"Adicionando novo peer {ip}:{port} status OFFLINE")
+        print_with_lock(f"Adicionando novo peer {ip}:{port} status OFFLINE")
     
     def add_peer_with_details(self, ip: str, port: int, online: bool, clock: int) -> None:
         with self.lock:
@@ -31,7 +32,7 @@ class PeerManager:
             peer = self.peers.get((ip, port))
             if not peer:
                 self.peers[(ip, port)] = Peer(ip, port, True)
-                print(f"\tAdicionando novo peer {ip}:{port} status ONLINE")
+                print_with_lock(f"\tAdicionando novo peer {ip}:{port} status ONLINE")
                 return
         peer.set_online()
 
