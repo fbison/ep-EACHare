@@ -2,6 +2,7 @@ import sys
 from eachare_app.connection import Connection
 from eachare_app.peer_manager import PeerManager
 from eachare_app.peer import Peer
+from eachare_app.utils import print_with_lock
 import os
 import threading
 import base64
@@ -10,11 +11,6 @@ import time
 from eachare_app.config import set_shared_dir, get_shared_dir
 # Exit constant
 EXIT_COMMAND = 9
-
-print_lock = threading.Lock()
-def print_with_lock(*args, **kwargs):
-    with print_lock:
-        print(*args, **kwargs)
 
 peer_manager = PeerManager()
 download_statistics = {}
